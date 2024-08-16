@@ -1,3 +1,5 @@
+use cpal;
+use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use iced::widget;
 use iced::{Element, Sandbox, Settings};
 
@@ -43,7 +45,38 @@ impl Sandbox for Counter {
     }
 }
 
+fn create_input_stream() -> Box<dyn StreamTrait> {
+    let host = cpal::default_host();
+    let device = host.default_input_device().unwrap();
+    let mut supported: Option<cpal::SupportedStreamConfigRange> = None;
+    for c in device.supported_input_configs().unwrap() {
+        if c.channels() == 1 {
+            supported = Some(c);
+            break;
+        }
+    }
+    // In theory, should check this rate is supported:
+    let config = supported.unwrap().with_sample_rate(cpal::SampleRate(44100));
+    Box::new(
+        device
+            .build_input_stream(
+                &config.config(),
+                move |data: &[u8], _: &cpal::InputCallbackInfo| {
+                    println!("Input: {} samples", data.len())
+                },
+                move |err| {
+                    println!("Stream error: {}", err);
+                },
+                None, // blocking
+            )
+            .unwrap(),
+    )
+}
+
 fn main() -> iced::Result {
+    // This will receive data in the background:
+    let _stream = create_input_stream();
+
     Counter::run(Settings {
         // This is a work-around for a bug with nvidia's linux vulkan drivers,
         // apparently, see https://github.com/iced-rs/iced/issues/2314
