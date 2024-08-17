@@ -1,7 +1,8 @@
 use cpal;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use iced::executor;
 use iced::widget;
-use iced::{Element, Sandbox, Settings};
+use iced::{Application, Command, Element, Settings, Theme};
 
 struct Counter {
     value: i64,
@@ -13,11 +14,14 @@ enum Message {
     Decrement,
 }
 
-impl Sandbox for Counter {
+impl Application for Counter {
+    type Executor = executor::Default;
+    type Flags = ();
     type Message = Message;
+    type Theme = Theme;
 
-    fn new() -> Counter {
-        Counter { value: 0 }
+    fn new(_flags: ()) -> (Counter, Command<Message>) {
+        (Counter { value: 0 }, Command::none())
     }
 
     fn title(&self) -> String {
@@ -33,15 +37,12 @@ impl Sandbox for Counter {
         .into()
     }
 
-    fn update(&mut self, message: Message) {
+    fn update(&mut self, message: Message) -> Command<Message> {
         match message {
-            Message::Increment => {
-                self.value += 1;
-            }
-            Message::Decrement => {
-                self.value -= 1;
-            }
-        }
+            Message::Increment => self.value += 1,
+            Message::Decrement => self.value -= 1,
+        };
+        Command::none()
     }
 }
 
