@@ -2,17 +2,24 @@ use async_channel;
 use cpal;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use iced::executor;
+use iced::subscription;
 use iced::widget;
-use iced::{Application, Command, Element, Settings, Theme};
+use iced::{Application, Command, Element, Settings, Subscription, Theme};
 
 struct Counter {
-    value: i64,
+    frame: usize,
+    stream: InputStream,
 }
 
 #[derive(Debug, Clone, Copy)]
 enum Message {
-    Increment,
-    Decrement,
+    AudioFrame(usize, usize),
+    AudioStreamClosed,
+}
+
+#[derive(Hash)]
+enum SubscriptionId {
+    AudioInput,
 }
 
 impl Application for Counter {
@@ -22,7 +29,13 @@ impl Application for Counter {
     type Theme = Theme;
 
     fn new(_flags: ()) -> (Counter, Command<Message>) {
-        (Counter { value: 0 }, Command::none())
+        (
+            Counter {
+                frame: 0,
+                stream: InputStream::new(),
+            },
+            Command::none(),
+        )
     }
 
     fn title(&self) -> String {
@@ -30,25 +43,34 @@ impl Application for Counter {
     }
 
     fn view(&self) -> Element<Message> {
-        widget::column![
-            widget::button("+").on_press(Message::Increment),
-            widget::text(self.value),
-            widget::button("-").on_press(Message::Decrement),
-        ]
-        .into()
+        widget::column![widget::text(format!("Frame: {}", self.frame)),].into()
     }
 
     fn update(&mut self, message: Message) -> Command<Message> {
         match message {
-            Message::Increment => self.value += 1,
-            Message::Decrement => self.value -= 1,
+            Message::AudioFrame(fr, _len) => self.frame = fr,
+            Message::AudioStreamClosed => panic!("unexpected"),
         };
         Command::none()
+    }
+
+    fn subscription(&self) -> Subscription<Message> {
+        subscription::unfold(
+            SubscriptionId::AudioInput,
+            self.stream.frames.clone(),
+            |receiver| async {
+                let msg = match receiver.recv().await {
+                    Ok((fr, samples)) => Message::AudioFrame(fr, samples.len()),
+                    Err(_) => Message::AudioStreamClosed,
+                };
+                (msg, receiver)
+            },
+        )
     }
 }
 
 struct InputStream {
-    _frames: async_channel::Receiver<Vec<u8>>,
+    frames: async_channel::Receiver<(usize, Vec<u8>)>,
     _stream: Box<dyn StreamTrait>,
 }
 
@@ -67,23 +89,23 @@ impl InputStream {
         }
         // In theory, should check this rate is supported:
         let config = supported.unwrap().with_sample_rate(cpal::SampleRate(44100));
+        let mut frame_count: usize = 0;
         let stream = Box::new(
             device
                 .build_input_stream(
                     &config.config(),
                     move |data: &[u8], _: &cpal::InputCallbackInfo| {
                         let len = data.len();
-                        match tx.try_send(Vec::from(data)) {
+                        match tx.try_send((frame_count, Vec::from(data))) {
                             Err(async_channel::TrySendError::Full(_)) => {
                                 println!("Dropped {} samples", len);
-                            },
+                            }
                             Err(async_channel::TrySendError::Closed(_)) => {
                                 println!("No receiver for {} samples", len);
-                            },
-                            Ok(()) => {
-                                println!("Input: {} samples", data.len());
                             }
+                            Ok(()) => {}
                         }
+                        frame_count += 1;
                     },
                     move |err| {
                         println!("Stream error: {}", err);
@@ -93,17 +115,19 @@ impl InputStream {
                 .unwrap(),
         );
 
-        InputStream { _frames: rx, _stream: stream }
+        InputStream {
+            frames: rx,
+            _stream: stream,
+        }
     }
 }
 
 fn main() -> iced::Result {
-    // This will receive data in the background:
-    let _stream = InputStream::new();
-
     Counter::run(Settings {
-        // This is a work-around for a bug with nvidia's linux vulkan drivers,
-        // apparently, see https://github.com/iced-rs/iced/issues/2314
+        // This is an unreliable work-around for a bug with nvidia's linux
+        // vulkan drivers, apparently, see
+        // https://github.com/iced-rs/iced/issues/2314
+        // If it doesn't work, try setting environment (source env.sh)
         antialiasing: true,
         ..Settings::default()
     })
