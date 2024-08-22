@@ -1,14 +1,16 @@
+use async_channel::Receiver;
 use iced::executor;
 use iced::subscription;
 use iced::widget;
 use iced::{Application, Command, Element, Settings, Subscription, Theme};
 
 mod stream;
-use stream::InputStream;
+use stream::{Frame, InputStream, WavWriter};
 
 struct Counter {
     frame: usize,
-    stream: InputStream,
+    _input: InputStream,
+    frame_stream: Receiver<Frame>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -29,10 +31,15 @@ impl Application for Counter {
     type Theme = Theme;
 
     fn new(_flags: ()) -> (Counter, Command<Message>) {
+        let input = InputStream::new();
+        let writer = WavWriter::new(input.frames.clone());
+        let frame_stream = writer.frames.clone();
+        writer.run();
         (
             Counter {
                 frame: 0,
-                stream: InputStream::new(),
+                _input: input,
+                frame_stream,
             },
             Command::none(),
         )
@@ -57,10 +64,10 @@ impl Application for Counter {
     fn subscription(&self) -> Subscription<Message> {
         subscription::unfold(
             SubscriptionId::AudioInput,
-            self.stream.frames.clone(),
+            self.frame_stream.clone(),
             |receiver| async {
                 let msg = match receiver.recv().await {
-                    Ok((fr, samples)) => Message::AudioFrame(fr, samples.len()),
+                    Ok(f) => Message::AudioFrame(f.number, f.samples.len()),
                     Err(_) => Message::AudioStreamClosed,
                 };
                 (msg, receiver)
