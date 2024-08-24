@@ -2,9 +2,13 @@ use async_channel::Receiver;
 use iced::executor;
 use iced::subscription;
 use iced::widget;
-use iced::{Application, Command, Element, Settings, Subscription, Theme};
+use iced::widget::canvas::Canvas;
+use iced::{Application, Command, Element, Length, Padding, Settings, Subscription, Theme};
 
+mod levels;
 mod stream;
+
+use levels::LevelPlot;
 use stream::{Frame, InputStream, WavWriter};
 
 struct Counter {
@@ -50,7 +54,16 @@ impl Application for Counter {
     }
 
     fn view(&self) -> Element<Message> {
-        widget::column![widget::text(format!("Frame: {}", self.frame)),].into()
+        widget::Container::new(widget::column![
+            widget::text(format!("Frame: {}", self.frame)),
+            Canvas::new(LevelPlot {})
+                .width(Length::Fill)
+                .height(Length::Fill)
+        ])
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .padding(Padding::new(5.))
+        .into()
     }
 
     fn update(&mut self, message: Message) -> Command<Message> {
