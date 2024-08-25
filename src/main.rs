@@ -9,7 +9,8 @@ mod levels;
 mod stream;
 
 use levels::LevelPlot;
-use stream::{Frame, InputStream, WavWriter};
+use stream::input::{Frame, InputStream};
+use stream::wav::WavWriter;
 
 struct Counter {
     frame: usize,
