@@ -15,6 +15,7 @@ pub const DEFAULT_SAMPLE_RATE: u32 = 44100;
 /// If multi-channel, these will be interlaced (I think lol)
 pub struct Frame {
     pub number: usize,
+    // TODO: use const generic instead for channels, sample_rate
     #[allow(dead_code)]
     pub channels: u16,
     #[allow(dead_code)]
