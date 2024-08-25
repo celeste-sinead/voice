@@ -8,7 +8,7 @@ use super::Message;
 
 impl Program<Message> for LevelPlot {
     type State = ();
-
+    // oh i see this is where you're drawing the cirlce
     fn draw(
         &self,
         _state: &(),

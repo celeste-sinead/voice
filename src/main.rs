@@ -12,12 +12,20 @@ use levels::LevelPlot;
 use stream::input::{Frame, InputStream};
 use stream::wav::WavWriter;
 
+/*
+* hello it is me import antigravity i am going to look through this and try and add comments
+* to document this code to see if i understand it yay ^_^
+*/
+
+// is usize like the Rust equivalent of the size_t type in C?
 struct Counter {
     frame: usize,
     _input: InputStream,
     frame_stream: Receiver<Frame>,
 }
 
+// this is for getting buffers from the audio device? i'm guessing the AudioFrame is (n_channels,
+// n_samples)?
 #[derive(Debug, Clone, Copy)]
 enum Message {
     AudioFrame(usize, usize),
@@ -35,6 +43,7 @@ impl Application for Counter {
     type Message = Message;
     type Theme = Theme;
 
+    // this just is the constructor for the application?
     fn new(_flags: ()) -> (Counter, Command<Message>) {
         let input = InputStream::new();
         let writer = WavWriter::new(input.frames.clone());
@@ -51,13 +60,14 @@ impl Application for Counter {
     }
 
     fn title(&self) -> String {
-        String::from("An example application")
+        String::from("Gay gay homosexual gay") // hehe :3
     }
 
+    // so is this the method that draws the screen? looks like you're adding that "Frame: " text
     fn view(&self) -> Element<Message> {
         widget::Container::new(widget::column![
             widget::text(format!("Frame: {}", self.frame)),
-            Canvas::new(LevelPlot {})
+            Canvas::new(LevelPlot {}) // is this the circle?
                 .width(Length::Fill)
                 .height(Length::Fill)
         ])
@@ -75,6 +85,7 @@ impl Application for Counter {
         Command::none()
     }
 
+    // i'm gonna need to look into what the fuck a subscription is
     fn subscription(&self) -> Subscription<Message> {
         subscription::unfold(
             SubscriptionId::AudioInput,

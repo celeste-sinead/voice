@@ -8,6 +8,7 @@ use hound;
 
 use super::input::{Frame, CHANNEL_MAX, DEFAULT_CHANNELS, DEFAULT_SAMPLE_RATE};
 
+// the fuck is a hound
 pub struct WavWriter {
     frames_in: Receiver<Frame>,
     spec: hound::WavSpec,
@@ -61,7 +62,7 @@ impl WavWriter {
                 }
 
                 match self.frame_sender.send_blocking(f) {
-                    Ok(()) => Ok(()),
+                    Ok(()) => Ok(()), // is this where the audio sample would be written?
                     Err(_) => Err(()),
                 }
             }
