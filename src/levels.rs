@@ -6,6 +6,9 @@ pub struct LevelPlot {}
 
 use super::Message;
 
+// A canvas Program that was intended to be built out into a signal RMS level
+// plot.
+// TODO: instead of implementing plotting from scratch, let's try plotters-iced
 impl Program<Message> for LevelPlot {
     type State = ();
     // oh i see this is where you're drawing the cirlce

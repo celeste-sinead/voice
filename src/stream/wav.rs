@@ -4,11 +4,15 @@ use std::thread;
 
 use async_channel;
 use async_channel::{Receiver, RecvError, Sender};
-use hound;
+use hound; // (provides .wav encoding)
 
 use super::input::{Frame, CHANNEL_MAX, DEFAULT_CHANNELS, DEFAULT_SAMPLE_RATE};
 
-// the fuck is a hound
+/// Used to write all the samples received from an audio input to a file
+/// (currently always ./session.wav), for ad-hoc testing and debugging.
+/// This is meant to consume from InputStream::frames, and WavWriter::frames
+/// is intended to be consumed by the application (or some additional
+/// processing step).
 pub struct WavWriter {
     frames_in: Receiver<Frame>,
     spec: hound::WavSpec,
@@ -28,13 +32,15 @@ impl WavWriter {
             bits_per_sample: 32,
             sample_format: hound::SampleFormat::Float,
         };
+        // TODO: parameterize the output file, have an option to not write the
+        // file, etc.
         let writer = hound::WavWriter::create("session.wav", spec).unwrap();
         WavWriter {
             frames_in,
             spec,
             writer,
             unflushed_count: 0,
-            flush_every: DEFAULT_SAMPLE_RATE as usize,
+            flush_every: DEFAULT_SAMPLE_RATE as usize, // i.e. every 1 second
             frame_sender,
             frames,
         }
@@ -43,8 +49,12 @@ impl WavWriter {
     pub fn write_one(&mut self) -> Result<(), ()> {
         match self.frames_in.recv_blocking() {
             Ok(f) => {
+                // TODO: these could be generic constants and then this could
+                // be guaranteed by the compiler?
                 assert!(f.channels == self.spec.channels);
                 assert!(f.sample_rate == self.spec.sample_rate);
+
+                // Add the samples to the write buffer
                 for s in f.samples.iter() {
                     if let Err(e) = self.writer.write_sample(*s) {
                         println!("Failed to write sample: {}", e);
@@ -52,6 +62,8 @@ impl WavWriter {
                     }
                 }
 
+                // Periodically flush the file, so it's a valid .wav up to the
+                // last ~second in the case of a crash
                 self.unflushed_count += f.samples.len();
                 if self.unflushed_count > self.flush_every {
                     if let Err(e) = self.writer.flush() {
@@ -61,8 +73,13 @@ impl WavWriter {
                     self.unflushed_count = 0;
                 }
 
+                // Pass the samples on to whatever wants them next
                 match self.frame_sender.send_blocking(f) {
-                    Ok(()) => Ok(()), // is this where the audio sample would be written?
+                    Ok(()) => Ok(()),
+                    // This means whatever next step has closed its end of the
+                    // channel; the caller should probably shut down (when this
+                    // struct is dropped, the input stream will be passed the
+                    // error, and will hopefully also shut down...)
                     Err(_) => Err(()),
                 }
             }
@@ -70,6 +87,9 @@ impl WavWriter {
         }
     }
 
+    /// Spawn a thread that receives frames, writes them out, and then passes
+    /// them on, until either the input or output channel is closed from the
+    /// other end.
     pub fn run(mut self) -> thread::JoinHandle<()> {
         thread::spawn(move || loop {
             if let Err(_) = self.write_one() {

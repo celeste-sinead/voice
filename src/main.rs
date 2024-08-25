@@ -12,23 +12,16 @@ use levels::LevelPlot;
 use stream::input::{Frame, InputStream};
 use stream::wav::WavWriter;
 
-/*
-* hello it is me import antigravity i am going to look through this and try and add comments
-* to document this code to see if i understand it yay ^_^
-*/
-
-// is usize like the Rust equivalent of the size_t type in C?
 struct Counter {
-    frame: usize,
+    frame: usize, // count frames received by the app
     _input: InputStream,
     frame_stream: Receiver<Frame>,
 }
 
-// this is for getting buffers from the audio device? i'm guessing the AudioFrame is (n_channels,
-// n_samples)?
+// The message type that is used to update iced application state
 #[derive(Debug, Clone, Copy)]
 enum Message {
-    AudioFrame(usize, usize),
+    AudioFrame(usize, usize), // TODO: this should be more real, not (frame_number, sample_count)
     AudioStreamClosed,
 }
 
@@ -43,12 +36,16 @@ impl Application for Counter {
     type Message = Message;
     type Theme = Theme;
 
-    // this just is the constructor for the application?
     fn new(_flags: ()) -> (Counter, Command<Message>) {
+        // Open the default audio input
         let input = InputStream::new();
+        // Write all the input to session.wav for ad-hoc testing / debugging:
         let writer = WavWriter::new(input.frames.clone());
+        // This will be used to subscribe the UI to audio data:
         let frame_stream = writer.frames.clone();
+        // Start a thread to write samples out and pass them on:
         writer.run();
+
         (
             Counter {
                 frame: 0,
@@ -63,11 +60,12 @@ impl Application for Counter {
         String::from("Gay gay homosexual gay") // hehe :3
     }
 
-    // so is this the method that draws the screen? looks like you're adding that "Frame: " text
     fn view(&self) -> Element<Message> {
+        // Wrap the UI in a Container that can be configured to fill whatever
+        // the current window size is, and lay out children to use that space
         widget::Container::new(widget::column![
             widget::text(format!("Frame: {}", self.frame)),
-            Canvas::new(LevelPlot {}) // is this the circle?
+            Canvas::new(LevelPlot {}) // just draws a border and a circle rn
                 .width(Length::Fill)
                 .height(Length::Fill)
         ])
@@ -85,7 +83,6 @@ impl Application for Counter {
         Command::none()
     }
 
-    // i'm gonna need to look into what the fuck a subscription is
     fn subscription(&self) -> Subscription<Message> {
         subscription::unfold(
             SubscriptionId::AudioInput,
