@@ -6,6 +6,7 @@ use iced::widget::canvas::Canvas;
 use iced::{Application, Command, Element, Length, Padding, Settings, Subscription, Theme};
 
 mod levels;
+mod mandelbrot;
 mod stream;
 
 use levels::LevelPlot;
