@@ -9,3 +9,4 @@ cpal = "0.15.3"
 futures = "0.3.30"
 hound = "3.5.1"
 iced = { version = "0.12.1", features = ["advanced", "canvas"] }
+plotters = "0.3.6"
