@@ -1,7 +1,10 @@
 use plotters::prelude::*;
 use std::ops::Range;
 
+#[allow(dead_code)] // TODO
 const OUT_FILE_NAME: &str = "plotters-doc-data/mandelbrot.png";
+
+#[allow(dead_code)] // TODO
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let root = BitMapBackend::new(OUT_FILE_NAME, (800, 600)).into_drawing_area();
 
@@ -41,6 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+#[allow(dead_code)] // TODO
 fn mandelbrot_set(
     real: Range<f64>,
     complex: Range<f64>,
@@ -65,6 +69,7 @@ fn mandelbrot_set(
         (c.0, c.1, cnt)
     })
 }
+
 #[test]
 fn entry_point() {
     main().unwrap()
