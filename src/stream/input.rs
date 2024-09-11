@@ -11,15 +11,45 @@ pub const CHANNEL_MAX: usize = 16;
 pub const DEFAULT_CHANNELS: u16 = 1;
 pub const DEFAULT_SAMPLE_RATE: u32 = 44100;
 
+#[derive(PartialEq, Eq, Copy, Clone)]
+pub struct ChannelCount(u16);
+
+impl ChannelCount {
+    pub fn new(c: u16) -> ChannelCount {
+        ChannelCount(c)
+    }
+}
+
+impl From<ChannelCount> for u16 {
+    fn from(v: ChannelCount) -> u16 {
+        v.0
+    }
+}
+
+#[derive(PartialEq, Eq, Copy, Clone)]
+pub struct SampleRate(u32);
+
+impl SampleRate {
+    pub fn new(s: u32) -> SampleRate {
+        SampleRate(s)
+    }
+}
+
+impl From<SampleRate> for u32 {
+    fn from(v: SampleRate) -> u32 {
+        v.0
+    }
+}
+
 /// A batch of samples received from an input device.
 /// If multi-channel, these will be interlaced (I think lol)
 pub struct Frame {
     pub number: usize,
     // TODO: use const generic instead for channels, sample_rate
     #[allow(dead_code)]
-    pub channels: u16,
+    pub channels: ChannelCount,
     #[allow(dead_code)]
-    pub sample_rate: u32,
+    pub sample_rate: SampleRate,
     pub samples: Vec<f32>,
 }
 
@@ -36,8 +66,8 @@ impl InputStream {
     pub fn new() -> InputStream {
         // TODO: these should be parameters. If they were generic constants
         // the type system could enforce that later processing steps match.
-        let channels = DEFAULT_CHANNELS;
-        let sample_rate = DEFAULT_SAMPLE_RATE;
+        let channels = ChannelCount(DEFAULT_CHANNELS);
+        let sample_rate = SampleRate(DEFAULT_SAMPLE_RATE);
 
         let host = cpal::default_host();
         // TODO: some way of selecting from available devices?
@@ -46,7 +76,7 @@ impl InputStream {
         // Find supported config for the desired number of channels:
         let mut supported: Option<cpal::SupportedStreamConfigRange> = None;
         for c in device.supported_input_configs().unwrap() {
-            if c.channels() == channels {
+            if c.channels() == channels.0 {
                 supported = Some(c);
                 break;
             }
@@ -60,7 +90,7 @@ impl InputStream {
         // to very large buffers resulting in high input latency.
         let config = supported
             .unwrap()
-            .with_sample_rate(cpal::SampleRate(sample_rate));
+            .with_sample_rate(cpal::SampleRate(sample_rate.0));
 
         // Frame counter, to be captured by the callback closure
         let mut frame_count: usize = 0;

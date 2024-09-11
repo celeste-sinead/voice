@@ -51,8 +51,8 @@ impl WavWriter {
             Ok(f) => {
                 // TODO: these could be generic constants and then this could
                 // be guaranteed by the compiler?
-                assert!(f.channels == self.spec.channels);
-                assert!(f.sample_rate == self.spec.sample_rate);
+                assert!(u16::from(f.channels) == self.spec.channels);
+                assert!(u32::from(f.sample_rate) == self.spec.sample_rate);
 
                 // Add the samples to the write buffer
                 for s in f.samples.iter() {
