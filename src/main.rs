@@ -16,6 +16,7 @@ mod stream;
 
 use levels::LevelPlot;
 use stream::executor::{Executor, CHANNEL_MAX};
+use stream::input::{ChannelCount, SampleRate};
 
 struct Counter {
     time: Duration,
@@ -44,7 +45,7 @@ impl Application for Counter {
 
     fn new(_flags: ()) -> (Counter, Command<Message>) {
         let (sender, audio_messages) = async_channel::bounded(CHANNEL_MAX);
-        let executor = Executor::new(sender);
+        let executor = Executor::new(sender, ChannelCount::new(2), SampleRate::new(44100));
 
         (
             Counter {

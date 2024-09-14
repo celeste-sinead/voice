@@ -3,9 +3,7 @@ use std::thread;
 use async_channel::{Receiver, Sender};
 
 use super::buffer::{InputBuffer, PeriodStream};
-use super::input::{
-    ChannelCount, Frame, InputStream, SampleRate, DEFAULT_CHANNELS, DEFAULT_SAMPLE_RATE,
-};
+use super::input::{ChannelCount, Frame, InputStream, SampleRate};
 use super::wav::WavWriter;
 use crate::dsp;
 use crate::Message;
@@ -15,24 +13,28 @@ use crate::Message;
 // just going to add latency to the situation.
 pub const CHANNEL_MAX: usize = 16;
 
-const DEFAULT_BUFFER_LEN: usize = 2 * DEFAULT_SAMPLE_RATE as usize;
-
 pub struct Executor {
+    channels: ChannelCount,
+    sample_rate: SampleRate,
     writer: WavWriter,
     periods: PeriodStream,
     sender: Sender<Message>,
 }
 
 impl Executor {
-    pub fn new(sender: Sender<Message>) -> Executor {
-        let channels = ChannelCount::new(DEFAULT_CHANNELS);
-        let sample_rate = SampleRate::new(DEFAULT_SAMPLE_RATE);
+    pub fn new(
+        sender: Sender<Message>,
+        channels: ChannelCount,
+        sample_rate: SampleRate,
+    ) -> Executor {
         Executor {
+            channels,
+            sample_rate,
             writer: WavWriter::new(channels, sample_rate),
             periods: PeriodStream::new(
-                InputBuffer::new(channels, sample_rate, DEFAULT_BUFFER_LEN),
-                DEFAULT_SAMPLE_RATE as usize / 10,
-                DEFAULT_SAMPLE_RATE as usize / 10,
+                InputBuffer::new(channels, sample_rate, usize::from(sample_rate) * 2),
+                usize::from(sample_rate) / 10,
+                usize::from(sample_rate) / 10,
             ),
             sender,
         }
@@ -75,7 +77,7 @@ impl Executor {
         thread::spawn(move || {
             // cpal::StreamTrait isn't Send, so the input device needs to
             // be opened on the executor thread.
-            let input = InputStream::new();
+            let input = InputStream::new(self.channels, self.sample_rate);
             self.run(input.frames);
         })
     }

@@ -4,9 +4,6 @@ use async_channel::{Receiver, TrySendError};
 use cpal;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
-pub const DEFAULT_CHANNELS: u16 = 1;
-pub const DEFAULT_SAMPLE_RATE: u32 = 44100;
-
 #[derive(PartialEq, Eq, Copy, Clone)]
 pub struct ChannelCount(u16);
 
@@ -75,12 +72,9 @@ pub struct InputStream {
 }
 
 impl InputStream {
-    pub fn new() -> InputStream {
+    pub fn new(channels: ChannelCount, sample_rate: SampleRate) -> InputStream {
         // TODO: these should be parameters. If they were generic constants
         // the type system could enforce that later processing steps match.
-        let channels = ChannelCount(DEFAULT_CHANNELS);
-        let sample_rate = SampleRate(DEFAULT_SAMPLE_RATE);
-
         let host = cpal::default_host();
         // TODO: some way of selecting from available devices?
         let device = host.default_input_device().unwrap();
