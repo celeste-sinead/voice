@@ -44,6 +44,7 @@ impl Executor {
         self.periods.push(frame);
         while let Some(p) = self.periods.next() {
             res.push(Message::RMSLevels {
+                time: p.start_time(),
                 values: p.channels().into_iter().map(|c| dsp::rms(&c)).collect(),
             });
         }

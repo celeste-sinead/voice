@@ -1,4 +1,5 @@
 use std::thread::JoinHandle;
+use std::time::Duration;
 
 use async_channel;
 use async_channel::Receiver;
@@ -17,6 +18,7 @@ use levels::LevelPlot;
 use stream::executor::{Executor, CHANNEL_MAX};
 
 struct Counter {
+    time: Duration,
     rms_levels: Vec<f32>,
     _audio_thread: JoinHandle<()>,
     audio_messages: Receiver<Message>,
@@ -25,7 +27,7 @@ struct Counter {
 // The message type that is used to update iced application state
 #[derive(Debug, Clone)]
 enum Message {
-    RMSLevels { values: Vec<f32> },
+    RMSLevels { time: Duration, values: Vec<f32> },
     AudioStreamClosed,
 }
 
@@ -46,6 +48,7 @@ impl Application for Counter {
 
         (
             Counter {
+                time: Duration::default(),
                 rms_levels: Vec::new(),
                 _audio_thread: executor.start(),
                 audio_messages,
@@ -62,7 +65,12 @@ impl Application for Counter {
         // Wrap the UI in a Container that can be configured to fill whatever
         // the current window size is, and lay out children to use that space
         widget::Container::new(widget::column![
-            widget::text(format!("Levels: {:?}", self.rms_levels)),
+            widget::text(format!(
+                "Time: {}:{:01}, Levels: {:?}",
+                self.time.as_secs(),
+                self.time.subsec_millis() / 100,
+                self.rms_levels
+            )),
             Canvas::new(LevelPlot {}) // just draws a border and a circle rn
                 .width(Length::Fill)
                 .height(Length::Fill)
@@ -75,9 +83,9 @@ impl Application for Counter {
 
     fn update(&mut self, message: Message) -> Command<Message> {
         match message {
-            Message::RMSLevels { values } => {
-                println!("RMS Levels: {:?}", values);
+            Message::RMSLevels { time, values } => {
                 self.rms_levels = values;
+                self.time = time;
             }
             Message::AudioStreamClosed => todo!(),
         };

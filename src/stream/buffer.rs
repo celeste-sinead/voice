@@ -2,6 +2,7 @@ use std::cmp;
 use std::collections::VecDeque;
 use std::iter;
 use std::slice;
+use std::time::Duration;
 
 use super::input::{ChannelCount, Frame, SampleRate};
 
@@ -122,6 +123,10 @@ impl<'a> Period<'a> {
         (0..usize::from(self.buffer.channels))
             .map(|i| self.get_channel(i))
             .collect()
+    }
+
+    pub fn start_time(&self) -> Duration {
+        Duration::from_secs_f32(self.start_sample_num as f32 / f32::from(self.buffer.sample_rate))
     }
 }
 
