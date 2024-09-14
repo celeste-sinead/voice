@@ -6,16 +6,13 @@ use async_channel::Receiver;
 use iced::executor;
 use iced::subscription;
 use iced::widget;
-use iced::widget::canvas::Canvas;
 use iced::{Application, Command, Element, Length, Padding, Settings, Subscription, Theme};
 use plotters_iced::{Chart, ChartBuilder, ChartWidget, DrawingBackend};
 
 mod dsp;
-mod levels;
 mod mandelbrot;
 mod stream;
 
-use levels::LevelPlot;
 use stream::executor::{Executor, CHANNEL_MAX};
 use stream::input::{ChannelCount, SampleRate};
 
@@ -76,9 +73,6 @@ impl Application for Counter {
                 self.rms_levels
             )),
             self.chart.view(),
-            Canvas::new(LevelPlot {}) // just draws a border and a circle rn
-                .width(Length::Fill)
-                .height(Length::Fill)
         ])
         .width(Length::Fill)
         .height(Length::Fill)
