@@ -82,8 +82,7 @@ pub struct Period<'a> {
 }
 
 impl<'a> Period<'a> {
-    /// Return the samples in the given channel, as a pair of consecutive slices
-    pub fn get_channel_slices(&'a self, channel: usize) -> (&'a [f32], &'a [f32]) {
+    pub fn get_channel(&'a self, channel: usize) -> ChannelPeriod<'a> {
         // Get all available samples, as 1-2 slices of ring buffer
         let (first_segment, second_segment) = self.buffer.buffers[channel].as_slices();
 
@@ -95,39 +94,25 @@ impl<'a> Period<'a> {
         let mut end = start + self.len;
 
         // Figure out if the period is in the first ring segment
-        let first = if start < first_segment.len() {
+        let slices: (&[f32], &[f32]) = if start < first_segment.len() {
             if end <= first_segment.len() {
                 // It's entirely in the first segment
-                return (&first_segment[start..end], &[]);
+                (&first_segment[start..end], &[])
             } else {
                 // It's split between the first and second segments
-                let slice = &first_segment[start..];
-                start = 0; // relative to the second segment
+                let first = &first_segment[start..];
+                start = 0;
                 end -= first_segment.len();
-                slice
+                (first, &second_segment[start..end])
             }
         } else {
             // It's entirely in the second segment
-            start -= first_segment.len(); // relative to the second segment
+            start -= first_segment.len();
             end -= first_segment.len();
-            &[]
+            (&second_segment[start..end], &[])
         };
 
-        if first.len() > 0 {
-            (first, &second_segment[start..end])
-        } else {
-            (&second_segment[start..end], &[])
-        }
-    }
-
-    /// Iterate over the samples in one channel
-    #[allow(dead_code)]
-    pub fn iter_channel(
-        &'a self,
-        channel: usize,
-    ) -> iter::Chain<slice::Iter<'a, f32>, slice::Iter<'a, f32>> {
-        let (a, b) = self.get_channel_slices(channel);
-        a.iter().chain(b.iter())
+        ChannelPeriod { slices }
     }
 
     pub fn start_sample_num(&self) -> usize {
@@ -136,6 +121,17 @@ impl<'a> Period<'a> {
 
     pub fn len(&self) -> usize {
         self.len
+    }
+}
+
+/// A contiguous period of samples in a single channel
+pub struct ChannelPeriod<'a> {
+    pub slices: (&'a [f32], &'a [f32]),
+}
+
+impl<'a> ChannelPeriod<'a> {
+    pub fn iter(&'a self) -> iter::Chain<slice::Iter<'a, f32>, slice::Iter<'a, f32>> {
+        self.slices.0.iter().chain(self.slices.1.iter())
     }
 }
 
@@ -245,7 +241,7 @@ mod tests {
         });
 
         if let Some(p) = stream.next() {
-            let (a, b) = p.get_channel_slices(0);
+            let (a, b) = p.get_channel(0).slices;
             assert_eq!(a, [1., 2., 3., 4.]);
             assert_eq!(b, []);
         } else {
@@ -253,7 +249,7 @@ mod tests {
         }
 
         if let Some(p) = stream.next() {
-            let (a, b) = p.get_channel_slices(0);
+            let (a, b) = p.get_channel(0).slices;
             assert_eq!(a, [3., 4., 5., 6.]);
             assert_eq!(b, []);
         } else {
@@ -270,7 +266,7 @@ mod tests {
         });
 
         if let Some(p) = stream.next() {
-            let (a, b) = p.get_channel_slices(0);
+            let (a, b) = p.get_channel(0).slices;
             assert_eq!(a, [5., 6., 7., 8.]);
             assert_eq!(b, []);
         } else {
@@ -300,7 +296,7 @@ mod tests {
 
         // Should be able to get the period that reaches the end of the stream
         if let Some(p) = stream.next() {
-            let (a, b) = p.get_channel_slices(0);
+            let (a, b) = p.get_channel(0).slices;
             assert_eq!(a, [4., 5., 6., 7.]);
             assert_eq!(b, []);
         } else {
@@ -317,10 +313,10 @@ mod tests {
 
         // And the next period should be split between sample 7 and 8:
         if let Some(p) = stream.next() {
-            let (a, b) = p.get_channel_slices(0);
+            let (a, b) = p.get_channel(0).slices;
             assert_eq!(a, [6., 7.]);
             assert_eq!(b, [8., 9.]);
-            let v: Vec<f32> = p.iter_channel(0).map(|x| *x).collect();
+            let v: Vec<f32> = p.get_channel(0).iter().map(|x| *x).collect();
             assert_eq!(v, [6., 7., 8., 9.])
         } else {
             panic!("expected period");
@@ -329,7 +325,7 @@ mod tests {
         // And then the next sample won't be split, but is interesting
         // because, internally it's entirely within the second ring segment
         if let Some(p) = stream.next() {
-            let (a, b) = p.get_channel_slices(0);
+            let (a, b) = p.get_channel(0).slices;
             assert_eq!(a, [8., 9., 10., 11.]);
             assert_eq!(b, []);
         } else {
