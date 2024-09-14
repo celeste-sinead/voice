@@ -1,3 +1,6 @@
+use std::thread::JoinHandle;
+
+use async_channel;
 use async_channel::Receiver;
 use iced::executor;
 use iced::subscription;
@@ -10,13 +13,12 @@ mod mandelbrot;
 mod stream;
 
 use levels::LevelPlot;
-use stream::input::{Frame, InputStream};
-use stream::wav::WavWriter;
+use stream::executor::{Executor, CHANNEL_MAX};
 
 struct Counter {
     frame: usize, // count frames received by the app
-    _input: InputStream,
-    frame_stream: Receiver<Frame>,
+    _audio_thread: JoinHandle<()>,
+    audio_messages: Receiver<Message>,
 }
 
 // The message type that is used to update iced application state
@@ -38,20 +40,14 @@ impl Application for Counter {
     type Theme = Theme;
 
     fn new(_flags: ()) -> (Counter, Command<Message>) {
-        // Open the default audio input
-        let input = InputStream::new();
-        // Write all the input to session.wav for ad-hoc testing / debugging:
-        let writer = WavWriter::new(input.frames.clone());
-        // This will be used to subscribe the UI to audio data:
-        let frame_stream = writer.frames.clone();
-        // Start a thread to write samples out and pass them on:
-        writer.run();
+        let (sender, audio_messages) = async_channel::bounded(CHANNEL_MAX);
+        let executor = Executor::new(sender);
 
         (
             Counter {
                 frame: 0,
-                _input: input,
-                frame_stream,
+                _audio_thread: executor.start(),
+                audio_messages,
             },
             Command::none(),
         )
@@ -79,7 +75,7 @@ impl Application for Counter {
     fn update(&mut self, message: Message) -> Command<Message> {
         match message {
             Message::AudioFrame(fr, _len) => self.frame = fr,
-            Message::AudioStreamClosed => panic!("unexpected"),
+            Message::AudioStreamClosed => todo!(),
         };
         Command::none()
     }
@@ -87,10 +83,10 @@ impl Application for Counter {
     fn subscription(&self) -> Subscription<Message> {
         subscription::unfold(
             SubscriptionId::AudioInput,
-            self.frame_stream.clone(),
+            self.audio_messages.clone(),
             |receiver| async {
                 let msg = match receiver.recv().await {
-                    Ok(f) => Message::AudioFrame(f.number, f.samples.len()),
+                    Ok(m) => m,
                     Err(_) => Message::AudioStreamClosed,
                 };
                 (msg, receiver)

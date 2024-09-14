@@ -10,7 +10,6 @@ use super::input::{ChannelCount, Frame, SampleRate};
 ///   we want to do will want to operate on contiguous data for each channel
 /// - allow us to adapt from whatever buffer size the device is using to
 ///   whatever period we want to use for processing (e.g. for FFTs)
-#[allow(dead_code)] // TODO: until it's used
 pub struct InputBuffer {
     max_len: usize,
     channels: ChannelCount,
@@ -19,7 +18,6 @@ pub struct InputBuffer {
     sample_count: usize,
 }
 
-#[allow(dead_code)] // TODO: until it's used
 impl InputBuffer {
     pub fn new(channels: ChannelCount, sample_rate: SampleRate, max_len: usize) -> InputBuffer {
         let mut buffers = Vec::new();
@@ -53,10 +51,13 @@ impl InputBuffer {
         }
     }
 
-    pub fn len(&self) -> usize {
+    fn len(&self) -> usize {
         return cmp::min(self.sample_count, self.max_len);
     }
+}
 
+#[cfg(test)]
+impl InputBuffer {
     /// Peek at the last n samples in the more recent segment of the ring
     /// buffer, returning fewer if n are not available.
     fn peek_tail(&self, channel: usize, n: usize) -> &[f32] {
@@ -72,14 +73,12 @@ impl InputBuffer {
 }
 
 /// A reference to a contiguous sequence of samples in an InputBuffer
-#[allow(dead_code)] // TODO: until it's used
 pub struct Period<'a> {
     buffer: &'a InputBuffer,
     start_sample_num: usize,
     len: usize,
 }
 
-#[allow(dead_code)] // TODO: until it's used
 impl<'a> Period<'a> {
     /// Return the samples in the given channel, as a pair of consecutive slices
     pub fn get_channel_slices(&'a self, channel: usize) -> (&'a [f32], &'a [f32]) {
@@ -127,10 +126,17 @@ impl<'a> Period<'a> {
         let (a, b) = self.get_channel_slices(channel);
         a.iter().chain(b.iter())
     }
+
+    pub fn start_sample_num(&self) -> usize {
+        self.start_sample_num
+    }
+
+    pub fn len(&self) -> usize {
+        self.len
+    }
 }
 
 /// Produces a stream of periods, as they become available in an InputBuffer
-#[allow(dead_code)] // TODO: until it's used
 pub struct PeriodStream {
     buffer: InputBuffer,
     period_len: usize,
@@ -138,7 +144,6 @@ pub struct PeriodStream {
     next_period_end: usize,
 }
 
-#[allow(dead_code)] // TODO: until it's used
 impl PeriodStream {
     /// A stream of Periods of length period_len, with the start/end advancing
     /// by period_stride for each subsequent period. (if the stride is less than

@@ -6,7 +6,8 @@ use async_channel;
 use async_channel::{Receiver, RecvError, Sender};
 use hound; // (provides .wav encoding)
 
-use super::input::{Frame, CHANNEL_MAX, DEFAULT_CHANNELS, DEFAULT_SAMPLE_RATE};
+use super::executor::CHANNEL_MAX;
+use super::input::{Frame, DEFAULT_CHANNELS, DEFAULT_SAMPLE_RATE};
 
 /// Used to write all the samples received from an audio input to a file
 /// (currently always ./session.wav), for ad-hoc testing and debugging.
