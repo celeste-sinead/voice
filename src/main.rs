@@ -8,6 +8,7 @@ use iced::subscription;
 use iced::widget;
 use iced::widget::canvas::Canvas;
 use iced::{Application, Command, Element, Length, Padding, Settings, Subscription, Theme};
+use plotters_iced::{Chart, ChartBuilder, ChartWidget, DrawingBackend};
 
 mod dsp;
 mod levels;
@@ -23,6 +24,7 @@ struct Counter {
     rms_levels: Vec<f32>,
     _audio_thread: JoinHandle<()>,
     audio_messages: Receiver<Message>,
+    chart: ExampleChart,
 }
 
 // The message type that is used to update iced application state
@@ -53,6 +55,7 @@ impl Application for Counter {
                 rms_levels: Vec::new(),
                 _audio_thread: executor.start(),
                 audio_messages,
+                chart: ExampleChart,
             },
             Command::none(),
         )
@@ -72,6 +75,7 @@ impl Application for Counter {
                 self.time.subsec_millis() / 100,
                 self.rms_levels
             )),
+            self.chart.view(),
             Canvas::new(LevelPlot {}) // just draws a border and a circle rn
                 .width(Length::Fill)
                 .height(Length::Fill)
@@ -105,6 +109,50 @@ impl Application for Counter {
                 (msg, receiver)
             },
         )
+    }
+}
+
+struct ExampleChart;
+
+impl Chart<Message> for ExampleChart {
+    type State = ();
+
+    fn build_chart<DB: DrawingBackend>(&self, _state: &Self::State, mut builder: ChartBuilder<DB>) {
+        use plotters::prelude::*;
+        let mut chart = builder
+            .caption("y=x^2", ("sans-serif", 20).into_font())
+            .margin(5)
+            .x_label_area_size(30)
+            .y_label_area_size(30)
+            .build_cartesian_2d(-1f32..1f32, -0.1f32..1f32)
+            .expect("Failed to build chart");
+
+        chart.configure_mesh().draw().expect("draw mesh");
+
+        chart
+            .draw_series(LineSeries::new(
+                (-50..=50).map(|x| x as f32 / 50.0).map(|x| (x, x * x)),
+                &RED,
+            ))
+            .expect("draw series")
+            .label("y = x^2")
+            .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &RED));
+
+        chart
+            .configure_series_labels()
+            .background_style(&WHITE.mix(0.8))
+            .border_style(&BLACK)
+            .draw()
+            .expect("draw series labels");
+    }
+}
+
+impl ExampleChart {
+    fn view(&self) -> Element<Message> {
+        ChartWidget::new(self)
+            .width(Length::Fixed(400.0))
+            .height(Length::Fixed(400.0))
+            .into()
     }
 }
 
