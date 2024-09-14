@@ -43,6 +43,12 @@ impl From<SampleRate> for u32 {
     }
 }
 
+impl From<SampleRate> for usize {
+    fn from(v: SampleRate) -> usize {
+        v.0 as usize
+    }
+}
+
 /// A batch of samples received from an input device.
 /// If multi-channel, these will be interlaced (I think lol)
 pub struct Frame {

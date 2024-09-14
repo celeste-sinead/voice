@@ -51,6 +51,7 @@ impl InputBuffer {
         }
     }
 
+    #[allow(dead_code)]
     fn len(&self) -> usize {
         return cmp::min(self.sample_count, self.max_len);
     }
@@ -74,6 +75,7 @@ impl InputBuffer {
 
 /// A reference to a contiguous sequence of samples in an InputBuffer
 pub struct Period<'a> {
+    #[allow(dead_code)]
     buffer: &'a InputBuffer,
     start_sample_num: usize,
     len: usize,
@@ -119,6 +121,7 @@ impl<'a> Period<'a> {
     }
 
     /// Iterate over the samples in one channel
+    #[allow(dead_code)]
     pub fn iter_channel(
         &'a self,
         channel: usize,

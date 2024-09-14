@@ -17,20 +17,19 @@ pub const CHANNEL_MAX: usize = 16;
 const DEFAULT_BUFFER_LEN: usize = 2 * DEFAULT_SAMPLE_RATE as usize;
 
 pub struct Executor {
-    // writer: WavWriter,
+    writer: WavWriter,
     periods: PeriodStream,
     sender: Sender<Message>,
 }
 
 impl Executor {
     pub fn new(sender: Sender<Message>) -> Executor {
+        let channels = ChannelCount::new(DEFAULT_CHANNELS);
+        let sample_rate = SampleRate::new(DEFAULT_SAMPLE_RATE);
         Executor {
+            writer: WavWriter::new(channels, sample_rate),
             periods: PeriodStream::new(
-                InputBuffer::new(
-                    ChannelCount::new(DEFAULT_CHANNELS),
-                    SampleRate::new(DEFAULT_SAMPLE_RATE),
-                    DEFAULT_BUFFER_LEN,
-                ),
+                InputBuffer::new(channels, sample_rate, DEFAULT_BUFFER_LEN),
                 DEFAULT_SAMPLE_RATE as usize / 10,
                 DEFAULT_SAMPLE_RATE as usize / 10,
             ),
@@ -38,16 +37,22 @@ impl Executor {
         }
     }
 
+    fn process(&mut self, frame: &Frame) -> Vec<Message> {
+        let mut res = Vec::new();
+        self.writer.push(frame).expect("session.wav write error");
+        self.periods.push(frame);
+        while let Some(p) = self.periods.next() {
+            res.push(Message::AudioFrame(p.start_sample_num() / 4410, p.len()));
+        }
+        res
+    }
+
     fn run(mut self, frames: Receiver<Frame>) {
         loop {
             match frames.recv_blocking() {
                 Ok(f) => {
-                    self.periods.push(&f);
-                    while let Some(p) = self.periods.next() {
-                        if let Err(_) = self.sender.send_blocking(Message::AudioFrame(
-                            p.start_sample_num() / 4410,
-                            p.len(),
-                        )) {
+                    for m in self.process(&f) {
+                        if let Err(_) = self.sender.send_blocking(m) {
                             println!("Executor exit: UI closed.");
                             return;
                         }
@@ -55,6 +60,7 @@ impl Executor {
                 }
                 Err(_) => {
                     println!("Executor exit: audio input closed.");
+                    let _e = self.sender.send_blocking(Message::AudioStreamClosed);
                     return;
                 }
             }
