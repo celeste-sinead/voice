@@ -112,26 +112,32 @@ impl<'a> Period<'a> {
             (&second_segment[start..end], &[])
         };
 
-        ChannelPeriod { slices }
+        ChannelPeriod {
+            slices,
+            len: self.len,
+        }
     }
 
-    pub fn start_sample_num(&self) -> usize {
-        self.start_sample_num
-    }
-
-    pub fn len(&self) -> usize {
-        self.len
+    pub fn channels(&'a self) -> Vec<ChannelPeriod<'a>> {
+        (0..usize::from(self.buffer.channels))
+            .map(|i| self.get_channel(i))
+            .collect()
     }
 }
 
 /// A contiguous period of samples in a single channel
 pub struct ChannelPeriod<'a> {
     pub slices: (&'a [f32], &'a [f32]),
+    len: usize,
 }
 
 impl<'a> ChannelPeriod<'a> {
     pub fn iter(&'a self) -> iter::Chain<slice::Iter<'a, f32>, slice::Iter<'a, f32>> {
         self.slices.0.iter().chain(self.slices.1.iter())
+    }
+
+    pub fn len(&self) -> usize {
+        self.len
     }
 }
 

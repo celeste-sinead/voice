@@ -8,6 +8,7 @@ use iced::widget;
 use iced::widget::canvas::Canvas;
 use iced::{Application, Command, Element, Length, Padding, Settings, Subscription, Theme};
 
+mod dsp;
 mod levels;
 mod mandelbrot;
 mod stream;
@@ -16,15 +17,15 @@ use levels::LevelPlot;
 use stream::executor::{Executor, CHANNEL_MAX};
 
 struct Counter {
-    frame: usize, // count frames received by the app
+    rms_levels: Vec<f32>,
     _audio_thread: JoinHandle<()>,
     audio_messages: Receiver<Message>,
 }
 
 // The message type that is used to update iced application state
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 enum Message {
-    AudioFrame(usize, usize), // TODO: this should be more real, not (frame_number, sample_count)
+    RMSLevels { values: Vec<f32> },
     AudioStreamClosed,
 }
 
@@ -45,7 +46,7 @@ impl Application for Counter {
 
         (
             Counter {
-                frame: 0,
+                rms_levels: Vec::new(),
                 _audio_thread: executor.start(),
                 audio_messages,
             },
@@ -61,7 +62,7 @@ impl Application for Counter {
         // Wrap the UI in a Container that can be configured to fill whatever
         // the current window size is, and lay out children to use that space
         widget::Container::new(widget::column![
-            widget::text(format!("Frame: {}", self.frame)),
+            widget::text(format!("Levels: {:?}", self.rms_levels)),
             Canvas::new(LevelPlot {}) // just draws a border and a circle rn
                 .width(Length::Fill)
                 .height(Length::Fill)
@@ -74,7 +75,10 @@ impl Application for Counter {
 
     fn update(&mut self, message: Message) -> Command<Message> {
         match message {
-            Message::AudioFrame(fr, _len) => self.frame = fr,
+            Message::RMSLevels { values } => {
+                println!("RMS Levels: {:?}", values);
+                self.rms_levels = values;
+            }
             Message::AudioStreamClosed => todo!(),
         };
         Command::none()

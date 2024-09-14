@@ -7,6 +7,7 @@ use super::input::{
     ChannelCount, Frame, InputStream, SampleRate, DEFAULT_CHANNELS, DEFAULT_SAMPLE_RATE,
 };
 use super::wav::WavWriter;
+use crate::dsp;
 use crate::Message;
 
 // The maximum length of channels passing audio data amongst threads
@@ -42,7 +43,9 @@ impl Executor {
         self.writer.push(frame).expect("session.wav write error");
         self.periods.push(frame);
         while let Some(p) = self.periods.next() {
-            res.push(Message::AudioFrame(p.start_sample_num() / 4410, p.len()));
+            res.push(Message::RMSLevels {
+                values: p.channels().into_iter().map(|c| dsp::rms(&c)).collect(),
+            });
         }
         res
     }
