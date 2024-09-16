@@ -76,9 +76,14 @@ impl InputBuffer {
 
 /// A reference to a contiguous sequence of samples in an InputBuffer
 pub struct Period<'a> {
-    #[allow(dead_code)]
     buffer: &'a InputBuffer,
     start_sample_num: usize,
+    len: usize,
+}
+
+/// A contiguous period of samples in a single channel
+pub struct ChannelPeriod<'a> {
+    pub slices: (&'a [f32], &'a [f32]),
     len: usize,
 }
 
@@ -94,8 +99,9 @@ impl<'a> Period<'a> {
         let mut start = self.buffer.len().checked_sub(len_to_buffer_end).unwrap();
         let mut end = start + self.len;
 
-        // Figure out if the period is in the first ring segment
+        // Figure out where this period is in the ring segments:
         let slices: (&[f32], &[f32]) = if start < first_segment.len() {
+            // At least part of the period is in the first segment...
             if end <= first_segment.len() {
                 // It's entirely in the first segment
                 (&first_segment[start..end], &[])
@@ -128,12 +134,6 @@ impl<'a> Period<'a> {
     pub fn start_time(&self) -> Duration {
         Duration::from_secs_f32(self.start_sample_num as f32 / f32::from(self.buffer.sample_rate))
     }
-}
-
-/// A contiguous period of samples in a single channel
-pub struct ChannelPeriod<'a> {
-    pub slices: (&'a [f32], &'a [f32]),
-    len: usize,
 }
 
 impl<'a> ChannelPeriod<'a> {

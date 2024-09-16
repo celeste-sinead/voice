@@ -21,7 +21,11 @@ pub struct Executor {
     sender: Sender<Message>,
 }
 
+/// Encapsulates the audio processing thread, which waits for samples from the
+/// input device, computes the results we want, and sends those results to
+/// the UI thread for display.
 impl Executor {
+    /// Create an executor that will send display updates via the given Sender
     pub fn new(
         sender: Sender<Message>,
         channels: ChannelCount,
@@ -40,6 +44,7 @@ impl Executor {
         }
     }
 
+    /// Handle a single frame of samples received from the input device
     fn process(&mut self, frame: &Frame) -> Vec<Message> {
         let mut res = Vec::new();
         self.writer.push(frame).expect("session.wav write error");
@@ -53,6 +58,7 @@ impl Executor {
         res
     }
 
+    /// The main loop of the audio processing thread
     fn run(mut self, frames: Receiver<Frame>) {
         loop {
             match frames.recv_blocking() {
@@ -73,6 +79,7 @@ impl Executor {
         }
     }
 
+    /// Spawn a new thread to run this executor
     pub fn start(self) -> thread::JoinHandle<()> {
         thread::spawn(move || {
             // cpal::StreamTrait isn't Send, so the input device needs to
