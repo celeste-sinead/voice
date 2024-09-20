@@ -1,11 +1,16 @@
 use plotters::prelude::*;
+use std::fs;
 use std::ops::Range;
+use std::path::Path;
 
 #[allow(dead_code)] // TODO
 const OUT_FILE_NAME: &str = "plotters-doc-data/mandelbrot.png";
 
 #[allow(dead_code)] // TODO
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    if let Some(parent) = Path::new(OUT_FILE_NAME).parent() {
+        fs::create_dir_all(parent).expect(&format!("Failed to create dir: {:?}", parent));
+    }
     let root = BitMapBackend::new(OUT_FILE_NAME, (800, 600)).into_drawing_area();
 
     root.fill(&WHITE)?;
