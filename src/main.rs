@@ -8,12 +8,13 @@ use iced::executor;
 use iced::subscription;
 use iced::widget;
 use iced::{Application, Command, Element, Length, Padding, Settings, Subscription, Theme};
-use plotters_iced::{Chart, ChartBuilder, ChartWidget, DrawingBackend};
 
 mod dsp;
+mod levels;
 mod mandelbrot;
 mod stream;
 
+use levels::LevelsChart;
 use stream::executor::{Executor, CHANNEL_MAX};
 use stream::input::{ChannelCount, SampleRate};
 
@@ -22,13 +23,13 @@ struct Counter {
     rms_levels: Vec<f32>,
     _audio_thread: JoinHandle<()>,
     audio_messages: Receiver<Message>,
-    chart: ExampleChart,
+    levels: LevelsChart,
 }
 
 // The message type that is used to update iced application state
 #[derive(Debug, Clone)]
 enum Message {
-    RMSLevels { time: Duration, values: Vec<f32> },
+    RMSLevels(levels::RMSLevels),
     AudioStreamClosed,
 }
 
@@ -76,7 +77,7 @@ impl Application for Counter {
                 rms_levels: Vec::new(),
                 _audio_thread: executor.start(),
                 audio_messages,
-                chart: ExampleChart,
+                levels: LevelsChart::new(Duration::from_secs(30)),
             },
             Command::none(),
         )
@@ -89,26 +90,19 @@ impl Application for Counter {
     fn view(&self) -> Element<Message> {
         // Wrap the UI in a Container that can be configured to fill whatever
         // the current window size is, and lay out children to use that space
-        widget::Container::new(widget::column![
-            widget::text(format!(
-                "Time: {}:{:01}, Levels: {:?}",
-                self.time.as_secs(),
-                self.time.subsec_millis() / 100,
-                self.rms_levels
-            )),
-            self.chart.view(),
-        ])
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .padding(Padding::new(5.))
-        .into()
+        widget::Container::new(widget::column![self.levels.view(),])
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .padding(Padding::new(5.))
+            .into()
     }
 
     fn update(&mut self, message: Message) -> Command<Message> {
         match message {
-            Message::RMSLevels { time, values } => {
-                self.rms_levels = values;
-                self.time = time;
+            Message::RMSLevels(l) => {
+                self.rms_levels = l.values.clone();
+                self.time = l.time;
+                self.levels.update(l);
             }
             Message::AudioStreamClosed => todo!(),
         };
@@ -127,50 +121,6 @@ impl Application for Counter {
                 (msg, receiver)
             },
         )
-    }
-}
-
-struct ExampleChart;
-
-impl Chart<Message> for ExampleChart {
-    type State = ();
-
-    fn build_chart<DB: DrawingBackend>(&self, _state: &Self::State, mut builder: ChartBuilder<DB>) {
-        use plotters::prelude::*;
-        let mut chart = builder
-            .caption("y=x^2", ("sans-serif", 20).into_font())
-            .margin(5)
-            .x_label_area_size(30)
-            .y_label_area_size(30)
-            .build_cartesian_2d(-1f32..1f32, -0.1f32..1f32)
-            .expect("Failed to build chart");
-
-        chart.configure_mesh().draw().expect("draw mesh");
-
-        chart
-            .draw_series(LineSeries::new(
-                (-50..=50).map(|x| x as f32 / 50.0).map(|x| (x, x * x)),
-                &RED,
-            ))
-            .expect("draw series")
-            .label("y = x^2")
-            .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &RED));
-
-        chart
-            .configure_series_labels()
-            .background_style(&WHITE.mix(0.8))
-            .border_style(&BLACK)
-            .draw()
-            .expect("draw series labels");
-    }
-}
-
-impl ExampleChart {
-    fn view(&self) -> Element<Message> {
-        ChartWidget::new(self)
-            .width(Length::Fixed(400.0))
-            .height(Length::Fixed(400.0))
-            .into()
     }
 }
 

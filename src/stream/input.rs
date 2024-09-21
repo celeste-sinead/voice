@@ -139,7 +139,6 @@ impl InputStream {
         // so this is possibly necessary.
         stream.play().expect("Failed to start stream");
 
-        println!("Receiver is_closed: {}", receiver.is_closed());
         InputStream {
             frames: receiver,
             _stream: stream,
