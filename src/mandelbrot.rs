@@ -75,6 +75,7 @@ impl Chart<Message> for MandelbrotChart {
 }
 
 impl MandelbrotChart {
+    #[allow(dead_code)]
     pub fn view(&self) -> Element<Message> {
         ChartWidget::new(self)
             .width(Length::Fixed(400.0))
