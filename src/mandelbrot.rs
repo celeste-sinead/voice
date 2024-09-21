@@ -1,21 +1,15 @@
-use plotters::prelude::*;
-use std::fs;
 use std::ops::Range;
-use std::path::Path;
 
-#[allow(dead_code)] // TODO
-const OUT_FILE_NAME: &str = "plotters-doc-data/mandelbrot.png";
+use iced::{Element, Length};
+use plotters::prelude::*;
+use plotters_iced::{Chart, ChartBuilder, ChartWidget, DrawingBackend};
 
-#[allow(dead_code)] // TODO
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    if let Some(parent) = Path::new(OUT_FILE_NAME).parent() {
-        fs::create_dir_all(parent).expect(&format!("Failed to create dir: {:?}", parent));
-    }
-    let root = BitMapBackend::new(OUT_FILE_NAME, (800, 600)).into_drawing_area();
+use crate::Message;
 
-    root.fill(&WHITE)?;
-
-    let mut chart = ChartBuilder::on(&root)
+fn draw_mandelbrot<DB: DrawingBackend>(
+    mut builder: ChartBuilder<DB>,
+) -> Result<(), DrawingAreaErrorKind<DB::ErrorType>> {
+    let mut chart = builder
         .margin(20)
         .x_label_area_size(10)
         .y_label_area_size(10)
@@ -42,14 +36,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    // To avoid the IO failure being ignored silently, we manually call the present function
-    root.present().expect("Unable to write result to file, please make sure 'plotters-doc-data' dir exists under current dir");
-    println!("Result has been saved to {}", OUT_FILE_NAME);
-
     Ok(())
 }
 
-#[allow(dead_code)] // TODO
 fn mandelbrot_set(
     real: Range<f64>,
     complex: Range<f64>,
@@ -75,7 +64,52 @@ fn mandelbrot_set(
     })
 }
 
-#[test]
-fn entry_point() {
-    main().unwrap()
+pub struct MandelbrotChart;
+
+impl Chart<Message> for MandelbrotChart {
+    type State = ();
+
+    fn build_chart<DB: DrawingBackend>(&self, _state: &Self::State, builder: ChartBuilder<DB>) {
+        draw_mandelbrot(builder).expect("Failed to draw mandelbrot");
+    }
+}
+
+impl MandelbrotChart {
+    pub fn view(&self) -> Element<Message> {
+        ChartWidget::new(self)
+            .width(Length::Fixed(400.0))
+            .height(Length::Fixed(400.0))
+            .into()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::fs;
+    use std::path::Path;
+
+    const OUT_FILE_NAME: &str = "plotters-doc-data/mandelbrot.png";
+
+    fn draw_bitmap() -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(parent) = Path::new(OUT_FILE_NAME).parent() {
+            fs::create_dir_all(parent).expect(&format!("Failed to create dir: {:?}", parent));
+        }
+        let root = BitMapBackend::new(OUT_FILE_NAME, (800, 600)).into_drawing_area();
+        root.fill(&WHITE)?;
+
+        draw_mandelbrot(ChartBuilder::on(&root)).expect("Failed to draw");
+
+        // To avoid the IO failure being ignored silently, we manually call the present function
+        root.present().expect("Unable to write result to file, please make sure 'plotters-doc-data' dir exists under current dir");
+        println!("Result has been saved to {}", OUT_FILE_NAME);
+
+        Ok(())
+    }
+
+    #[test]
+    fn entry_point() {
+        draw_bitmap().unwrap()
+    }
 }

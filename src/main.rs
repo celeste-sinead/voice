@@ -13,6 +13,7 @@ mod dsp;
 mod mandelbrot;
 mod stream;
 
+use mandelbrot::MandelbrotChart;
 use stream::executor::{Executor, CHANNEL_MAX};
 use stream::input::{ChannelCount, SampleRate};
 
@@ -22,6 +23,7 @@ struct Counter {
     _audio_thread: JoinHandle<()>,
     audio_messages: Receiver<Message>,
     chart: ExampleChart,
+    mandelbrot: MandelbrotChart,
 }
 
 // The message type that is used to update iced application state
@@ -53,6 +55,7 @@ impl Application for Counter {
                 _audio_thread: executor.start(),
                 audio_messages,
                 chart: ExampleChart,
+                mandelbrot: MandelbrotChart,
             },
             Command::none(),
         )
@@ -73,6 +76,7 @@ impl Application for Counter {
                 self.rms_levels
             )),
             self.chart.view(),
+            self.mandelbrot.view(),
         ])
         .width(Length::Fill)
         .height(Length::Fill)
