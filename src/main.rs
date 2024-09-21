@@ -3,6 +3,7 @@ use std::time::Duration;
 
 use async_channel;
 use async_channel::Receiver;
+use clap::Parser;
 use iced::executor;
 use iced::subscription;
 use iced::widget;
@@ -38,15 +39,38 @@ enum SubscriptionId {
     AudioInput,
 }
 
+#[derive(Debug, Parser)]
+struct Args {
+    /// The number of channels for audio input
+    #[arg(short, long, default_value_t = 2)]
+    channels: u16,
+    /// The sample rate (Hz) for audio input
+    #[arg(short, long, default_value_t = 44100)]
+    sample_rate: u32,
+}
+
+impl Default for Args {
+    fn default() -> Args {
+        Args {
+            channels: 2,
+            sample_rate: 44100,
+        }
+    }
+}
+
 impl Application for Counter {
     type Executor = executor::Default;
-    type Flags = ();
+    type Flags = Args;
     type Message = Message;
     type Theme = Theme;
 
-    fn new(_flags: ()) -> (Counter, Command<Message>) {
+    fn new(args: Args) -> (Counter, Command<Message>) {
         let (sender, audio_messages) = async_channel::bounded(CHANNEL_MAX);
-        let executor = Executor::new(sender, ChannelCount::new(2), SampleRate::new(44100));
+        let executor = Executor::new(
+            sender,
+            ChannelCount::new(args.channels),
+            SampleRate::new(args.sample_rate),
+        );
 
         (
             Counter {
@@ -155,7 +179,9 @@ impl ExampleChart {
 }
 
 fn main() -> iced::Result {
+    let args = Args::parse();
     Counter::run(Settings {
+        flags: args,
         // This is an unreliable work-around for a bug with nvidia's linux
         // vulkan drivers, apparently, see
         // https://github.com/iced-rs/iced/issues/2314
