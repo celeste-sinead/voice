@@ -5,16 +5,8 @@ use std::time::Duration;
 use iced::{Element, Length};
 use plotters_iced::{Chart, ChartBuilder, ChartWidget, DrawingBackend};
 
-use crate::dsp::Decibels;
-use crate::Message;
-
-#[derive(Clone, Debug)]
-pub struct RMSLevels {
-    /// The end time of the measurement period
-    pub time: Duration,
-    /// Full scale RMS, for each channel
-    pub values: Vec<f32>,
-}
+use audio::dsp::Decibels;
+use audio::{Message, RMSLevels};
 
 pub struct LevelsChart {
     /// The width of the chart

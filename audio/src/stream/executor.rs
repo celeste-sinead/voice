@@ -5,7 +5,7 @@ use async_channel::{Receiver, Sender};
 use super::buffer::{InputBuffer, PeriodStream};
 use super::input::{ChannelCount, Frame, InputStream, SampleRate};
 use super::wav::WavWriter;
-use crate::{dsp, levels, Message};
+use crate::{dsp, Message, RMSLevels};
 
 // The maximum length of channels passing audio data amongst threads
 // This shouldn't be large; if a consumer isn't keeping up long channels are
@@ -49,7 +49,7 @@ impl Executor {
         self.writer.push(frame).expect("session.wav write error");
         self.periods.push(frame);
         while let Some(p) = self.periods.next() {
-            res.push(Message::RMSLevels(levels::RMSLevels {
+            res.push(Message::RMSLevels(RMSLevels {
                 time: p.start_time(),
                 values: p.channels().into_iter().map(|c| dsp::rms(&c)).collect(),
             }));

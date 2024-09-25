@@ -9,14 +9,13 @@ use iced::subscription;
 use iced::widget;
 use iced::{Application, Command, Element, Length, Padding, Settings, Subscription, Theme};
 
-mod dsp;
 mod levels;
 mod mandelbrot;
-mod stream;
 
+use audio::stream::executor::{Executor, CHANNEL_MAX};
+use audio::stream::input::{ChannelCount, SampleRate};
+use audio::Message;
 use levels::LevelsChart;
-use stream::executor::{Executor, CHANNEL_MAX};
-use stream::input::{ChannelCount, SampleRate};
 
 struct Counter {
     time: Duration,
@@ -24,13 +23,6 @@ struct Counter {
     _audio_thread: JoinHandle<()>,
     audio_messages: Receiver<Message>,
     levels: LevelsChart,
-}
-
-// The message type that is used to update iced application state
-#[derive(Debug, Clone)]
-enum Message {
-    RMSLevels(levels::RMSLevels),
-    AudioStreamClosed,
 }
 
 #[derive(Hash)]
