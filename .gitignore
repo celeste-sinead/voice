@@ -26,3 +26,4 @@ Cargo.lock
 # Etc:
 session.wav
 plotters-doc-data
+.ipynb_checkpoints
