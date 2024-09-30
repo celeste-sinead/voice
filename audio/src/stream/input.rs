@@ -1,6 +1,6 @@
 use super::executor::CHANNEL_MAX;
 use async_channel;
-use async_channel::{Receiver, TrySendError};
+use async_channel::{Receiver, TryRecvError, TrySendError};
 use cpal;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
@@ -55,24 +55,32 @@ impl From<SampleRate> for f32 {
 /// A batch of samples received from an input device.
 /// If multi-channel, these will be interlaced (I think lol)
 pub struct Frame {
-    #[allow(dead_code)]
-    pub number: usize,
     pub channels: ChannelCount,
     pub sample_rate: SampleRate,
     pub samples: Vec<f32>,
 }
 
+pub enum InputError {
+    DeviceClosed,
+    StreamEnded,
+}
+
+pub trait Input {
+    fn next(&mut self) -> Result<Frame, InputError>;
+    fn try_next(&mut self) -> Result<Option<Frame>, InputError>;
+}
+
 /// Opens a stream from an audio input device, receives sample data callbacks
 /// (which are called by a thread owned by the audio library), and sends the
 /// data to consuming threads via `async_channel`.
-pub struct InputStream {
+pub struct InputDevice {
     pub frames: Receiver<Frame>,
     // This owns the input callbacks (and will close the stream when dropped).
     _stream: Box<dyn StreamTrait>,
 }
 
-impl InputStream {
-    pub fn new(channels: ChannelCount, sample_rate: SampleRate) -> InputStream {
+impl InputDevice {
+    pub fn new(channels: ChannelCount, sample_rate: SampleRate) -> InputDevice {
         // TODO: these should be parameters. If they were generic constants
         // the type system could enforce that later processing steps match.
         let host = cpal::default_host();
@@ -98,9 +106,6 @@ impl InputStream {
             .unwrap()
             .with_sample_rate(cpal::SampleRate(sample_rate.0));
 
-        // Frame counter, to be captured by the callback closure
-        let mut frame_count: usize = 0;
-
         let (sender, receiver) = async_channel::bounded(CHANNEL_MAX);
         let stream = Box::new(
             device
@@ -108,7 +113,6 @@ impl InputStream {
                     &config.config(),
                     move |data: &[f32], _: &cpal::InputCallbackInfo| {
                         match sender.try_send(Frame {
-                            number: frame_count,
                             channels,
                             sample_rate,
                             samples: Vec::from(data),
@@ -117,7 +121,7 @@ impl InputStream {
                                 // TODO: does this need any more handling?
                                 // The consumer could notice a drop by watching
                                 // the frame number.
-                                println!("InputStream: dropped {} samples", data.len());
+                                println!("InputDevice: dropped {} samples", data.len());
                             }
                             Err(TrySendError::Closed(_)) => {
                                 // TODO: close the stream?
@@ -125,7 +129,6 @@ impl InputStream {
                             }
                             Ok(()) => {}
                         }
-                        frame_count += 1;
                     },
                     move |_err| {
                         // Can these be transient?
@@ -139,9 +142,26 @@ impl InputStream {
         // so this is possibly necessary.
         stream.play().expect("Failed to start stream");
 
-        InputStream {
+        InputDevice {
             frames: receiver,
             _stream: stream,
+        }
+    }
+}
+
+impl Input for InputDevice {
+    fn next(&mut self) -> Result<Frame, InputError> {
+        match self.frames.recv_blocking() {
+            Ok(f) => Ok(f),
+            Err(_) => Err(InputError::DeviceClosed),
+        }
+    }
+
+    fn try_next(&mut self) -> Result<Option<Frame>, InputError> {
+        match self.frames.try_recv() {
+            Ok(f) => Ok(Some(f)),
+            Err(TryRecvError::Empty) => Ok(None),
+            Err(TryRecvError::Closed) => Err(InputError::DeviceClosed),
         }
     }
 }

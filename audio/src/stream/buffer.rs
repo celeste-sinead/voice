@@ -201,7 +201,6 @@ mod tests {
         let mut buf: InputBuffer =
             InputBuffer::new(ChannelCount::new(2), SampleRate::new(44100), 100);
         buf.push(&Frame {
-            number: 0,
             channels: ChannelCount::new(2),
             sample_rate: SampleRate::new(44100),
             samples: vec![1., 2., 3., 4.],
@@ -216,14 +215,12 @@ mod tests {
             InputBuffer::new(ChannelCount::new(1), SampleRate::new(44100), 4);
         // Add 3 1's, almost filling the max length of 4
         buf.push(&Frame {
-            number: 0,
             channels: ChannelCount::new(1),
             sample_rate: SampleRate::new(44100),
             samples: vec![1.; 3],
         });
         // Add 2 2's, filling the ring, and then replacing the first 1
         buf.push(&Frame {
-            number: 0,
             channels: ChannelCount::new(1),
             sample_rate: SampleRate::new(44100),
             samples: vec![2.; 2],
@@ -245,7 +242,6 @@ mod tests {
             2,
         );
         stream.push(&Frame {
-            number: 0,
             channels: ChannelCount::new(1),
             sample_rate: SampleRate::new(44100),
             samples: (1..8).map(|x| x as f32).collect(),
@@ -270,7 +266,6 @@ mod tests {
         assert!(stream.next().is_none());
 
         stream.push(&Frame {
-            number: 0,
             channels: ChannelCount::new(1),
             sample_rate: SampleRate::new(44100),
             samples: (8..9).map(|x| x as f32).collect(),
@@ -294,7 +289,6 @@ mod tests {
             2,
         );
         stream.push(&Frame {
-            number: 0,
             channels: ChannelCount::new(1),
             sample_rate: SampleRate::new(44100),
             samples: (0..8).map(|x| x as f32).collect(),
@@ -316,7 +310,6 @@ mod tests {
 
         // Add some more samples, which should produce a split ring:
         stream.push(&Frame {
-            number: 0,
             channels: ChannelCount::new(1),
             sample_rate: SampleRate::new(44100),
             samples: (8..12).map(|x| x as f32).collect(),

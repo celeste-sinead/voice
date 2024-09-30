@@ -1,9 +1,9 @@
 use std::thread;
 
-use async_channel::{Receiver, Sender};
+use async_channel::Sender;
 
 use super::buffer::{InputBuffer, PeriodStream};
-use super::input::{ChannelCount, Frame, InputStream, SampleRate};
+use super::input::{ChannelCount, Frame, Input, InputDevice, SampleRate};
 use super::wav::WavWriter;
 use crate::{dsp, Message, RMSLevels};
 
@@ -58,9 +58,9 @@ impl Executor {
     }
 
     /// The main loop of the audio processing thread
-    fn run(mut self, frames: Receiver<Frame>) {
+    fn run<T: Input>(mut self, mut input: T) {
         loop {
-            match frames.recv_blocking() {
+            match input.next() {
                 Ok(f) => {
                     for m in self.process(&f) {
                         if let Err(_) = self.sender.send_blocking(m) {
@@ -83,8 +83,8 @@ impl Executor {
         thread::spawn(move || {
             // cpal::StreamTrait isn't Send, so the input device needs to
             // be opened on the executor thread.
-            let input = InputStream::new(self.channels, self.sample_rate);
-            self.run(input.frames);
+            let input = InputDevice::new(self.channels, self.sample_rate);
+            self.run(input);
         })
     }
 }
