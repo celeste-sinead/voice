@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 #[cfg(test)]
 #[macro_use]
 extern crate approx;
@@ -8,10 +6,12 @@ pub mod dsp;
 pub mod stream;
 pub mod synth;
 
+use stream::input::Instant;
+
 #[derive(Clone, Debug)]
 pub struct RMSLevels {
     /// The end time of the measurement period
-    pub time: Duration,
+    pub time: Instant,
     /// Full scale RMS, for each channel
     pub values: Vec<f32>,
 }

@@ -1,17 +1,17 @@
 # Jupyter Notebooks
-Install Jupyter:
+Install Jupyter Lab:
 ```sh
-sudo apt install jupyter-notebook
+pip install jupyterlab
 ```
 
 Install [evcxr_jupyter](https://github.com/evcxr/evcxr/tree/main/evcxr_jupyter):
 ```sh
 rustup component add rust-src
-cargo install --locked evcxr_jupyter
+cargo install --locked evcxr_jupyter # Also evcxr_repl if you want
 evcxr_jupyter --install
 ```
 
 Run Jupyter, in the root of this repository:
 ```sh
-jupyter notebook
+jupyter lab
 ```

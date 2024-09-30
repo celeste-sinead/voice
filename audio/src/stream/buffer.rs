@@ -2,9 +2,8 @@ use std::cmp;
 use std::collections::VecDeque;
 use std::iter;
 use std::slice;
-use std::time::Duration;
 
-use super::input::{ChannelCount, Frame, Input, InputError, SampleRate};
+use super::input::{ChannelCount, Frame, Input, InputError, Instant, SampleRate};
 
 /// A set of per-channel ringbuffers. This accomplishes two things:
 /// - de-interlaces the samples we receive from the device, because ~everything
@@ -84,13 +83,11 @@ pub struct Period<'a> {
     len: usize,
 }
 
-/// A contiguous period of samples in a single channel
-pub struct ChannelPeriod<'a> {
-    pub slices: (&'a [f32], &'a [f32]),
-    len: usize,
-}
-
 impl<'a> Period<'a> {
+    pub fn channel_count(&self) -> ChannelCount {
+        self.buffer.channels
+    }
+
     pub fn get_channel(&'a self, channel: usize) -> ChannelPeriod<'a> {
         // Get all available samples, as 1-2 slices of ring buffer
         let (first_segment, second_segment) = self.buffer.buffers[channel].as_slices();
@@ -124,6 +121,8 @@ impl<'a> Period<'a> {
 
         ChannelPeriod {
             slices,
+            sample_rate: self.buffer.sample_rate,
+            start_sample_num: self.start_sample_num,
             len: self.len,
         }
     }
@@ -134,9 +133,21 @@ impl<'a> Period<'a> {
             .collect()
     }
 
-    pub fn start_time(&self) -> Duration {
-        Duration::from_secs_f32(self.start_sample_num as f32 / f32::from(self.buffer.sample_rate))
+    pub fn start_time(&self) -> Instant {
+        Instant::from_sample_num(self.start_sample_num, self.buffer.sample_rate)
     }
+
+    pub fn end_time(&self) -> Instant {
+        Instant::from_sample_num(self.start_sample_num + self.len, self.buffer.sample_rate)
+    }
+}
+
+/// A contiguous period of samples in a single channel
+pub struct ChannelPeriod<'a> {
+    pub slices: (&'a [f32], &'a [f32]),
+    sample_rate: SampleRate,
+    start_sample_num: usize,
+    len: usize,
 }
 
 impl<'a> ChannelPeriod<'a> {
@@ -146,6 +157,49 @@ impl<'a> ChannelPeriod<'a> {
 
     pub fn len(&self) -> usize {
         self.len
+    }
+
+    pub fn into_timeseries(self) -> TimeseriesIterator<'a> {
+        TimeseriesIterator {
+            period: self,
+            first_slice: true,
+            index: 0,
+        }
+    }
+}
+
+pub struct TimeseriesIterator<'a> {
+    period: ChannelPeriod<'a>,
+    first_slice: bool,
+    index: usize,
+}
+
+impl<'a> Iterator for TimeseriesIterator<'a> {
+    type Item = (Instant, f32);
+    fn next(&mut self) -> Option<Self::Item> {
+        let slice = if self.first_slice {
+            self.period.slices.0
+        } else {
+            self.period.slices.1
+        };
+        if self.index < slice.len() {
+            let res = Some((
+                Instant::from_sample_num(
+                    self.period.start_sample_num + self.index,
+                    self.period.sample_rate,
+                ),
+                slice[self.index],
+            ));
+            self.index += 1;
+            res
+        } else {
+            if self.first_slice {
+                self.first_slice = false;
+                self.next()
+            } else {
+                None
+            }
+        }
     }
 }
 

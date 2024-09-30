@@ -52,6 +52,24 @@ impl From<SampleRate> for f32 {
     }
 }
 
+/// Represents a point in time, in seconds, in a signal
+/// Essentially the same as std::time::Instant, but the latter is unusably
+/// opaque.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Instant(f32);
+
+impl Instant {
+    pub fn from_sample_num(sample: usize, rate: SampleRate) -> Instant {
+        Instant(sample as f32 / f32::from(rate))
+    }
+}
+
+impl From<Instant> for f32 {
+    fn from(v: Instant) -> f32 {
+        v.0 as f32
+    }
+}
+
 /// A batch of samples received from an input device.
 /// If multi-channel, these will be interlaced (I think lol)
 pub struct Frame {

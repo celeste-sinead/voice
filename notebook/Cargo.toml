@@ -1,0 +1,8 @@
+[package]
+name = "notebook"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+audio = { version = "0.1.0", path = "../audio" }
+plotters = { version = "0.3.6", features = ["evcxr"] }
