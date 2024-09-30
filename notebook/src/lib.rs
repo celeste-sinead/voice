@@ -9,12 +9,13 @@
 pub use audio;
 pub use audio::stream::buffer::{BufferedInput, Period};
 pub use audio::stream::input::SampleRate;
-pub use audio::synth;
+pub use audio::{dsp, synth};
+pub use num_complex::Complex;
 pub use plotters;
 use plotters::evcxr::SVGWrapper;
-use plotters::prelude::*;
+pub use plotters::prelude::*;
 
-pub fn plot_period(period: Period) -> SVGWrapper {
+pub fn plot_period(period: &Period) -> SVGWrapper {
     evcxr_figure((640, 480), |root| {
         assert!(u16::from(period.channel_count()) == 1);
 

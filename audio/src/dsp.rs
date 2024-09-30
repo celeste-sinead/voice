@@ -1,3 +1,8 @@
+use std::sync::Arc;
+
+use num_complex::Complex;
+use rustfft::{Fft, FftPlanner};
+
 use crate::stream::buffer::ChannelPeriod;
 
 pub fn rms(period: &ChannelPeriod) -> f32 {
@@ -18,6 +23,27 @@ impl Decibels {
 impl From<Decibels> for f32 {
     fn from(db: Decibels) -> f32 {
         db.0
+    }
+}
+
+pub struct FFTSequence {
+    fft: Arc<dyn Fft<f32>>,
+}
+
+impl FFTSequence {
+    pub fn new(period_len: usize) -> FFTSequence {
+        FFTSequence {
+            // nb: reusing the planner is recommended if a lot of these are
+            // going to get constructed.
+            fft: FftPlanner::new().plan_fft_forward(period_len),
+        }
+    }
+
+    pub fn fft(&self, period: &ChannelPeriod) -> Vec<Complex<f32>> {
+        let mut res: Vec<Complex<f32>> =
+            period.iter().map(|y| Complex { re: *y, im: 0. }).collect();
+        self.fft.process(&mut res);
+        res
     }
 }
 
