@@ -4,7 +4,7 @@ use std::iter;
 use std::slice;
 use std::time::Duration;
 
-use super::input::{ChannelCount, Frame, SampleRate};
+use super::input::{ChannelCount, Frame, Input, InputError, SampleRate};
 
 /// A set of per-channel ringbuffers. This accomplishes two things:
 /// - de-interlaces the samples we receive from the device, because ~everything
@@ -52,9 +52,12 @@ impl SampleBuffer {
         }
     }
 
-    #[allow(dead_code)]
     fn len(&self) -> usize {
         return cmp::min(self.sample_count, self.max_len);
+    }
+
+    fn oldest_sample_index(&self) -> usize {
+        self.sample_count - self.len()
     }
 }
 
@@ -170,12 +173,26 @@ impl PeriodBuffer {
     }
 
     pub fn push(&mut self, f: &Frame) {
-        self.buffer.push(f)
+        self.buffer.push(f);
+        // Verify the start of the buffer hasn't moved past the start of the
+        // next period, which might happen if too many samples get pushed
+        // between calls to next()
+        let next_period_start = self.next_period_end - self.period_len;
+        assert!(
+            next_period_start >= self.buffer.oldest_sample_index(),
+            "next_period_start = {}, oldest_sample_index = {}",
+            next_period_start,
+            self.buffer.oldest_sample_index()
+        );
+    }
+
+    pub fn has_next(&self) -> bool {
+        self.next_period_end <= self.buffer.sample_count
     }
 
     /// Get the next available Period, if any
     pub fn next(&mut self) -> Option<Period> {
-        if self.next_period_end <= self.buffer.sample_count {
+        if self.has_next() {
             let period = Period {
                 buffer: &self.buffer,
                 len: self.period_len,
@@ -186,6 +203,34 @@ impl PeriodBuffer {
         } else {
             None
         }
+    }
+}
+
+pub struct BufferedInput<T: Input> {
+    input: T,
+    buffer: PeriodBuffer,
+}
+
+impl<T: Input> BufferedInput<T> {
+    /// The BufferedInput will get its sample rate and channel count from the input
+    pub fn new(mut input: T, period_len: usize) -> Result<BufferedInput<T>, InputError> {
+        let frame = input.next()?;
+        let mut buffer = PeriodBuffer::new(
+            SampleBuffer::new(frame.channels, frame.sample_rate, 2 * period_len),
+            period_len,
+            period_len,
+        );
+        buffer.push(&frame);
+        Ok(BufferedInput { input, buffer })
+    }
+
+    pub fn next(&mut self) -> Result<Period, InputError> {
+        // Read from the input until a full period is available
+        while !self.buffer.has_next() {
+            let frame = self.input.next()?;
+            self.buffer.push(&frame);
+        }
+        Ok(self.buffer.next().unwrap())
     }
 }
 

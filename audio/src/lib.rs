@@ -1,7 +1,12 @@
 use std::time::Duration;
 
+#[cfg(test)]
+#[macro_use]
+extern crate approx;
+
 pub mod dsp;
 pub mod stream;
+pub mod synth;
 
 #[derive(Clone, Debug)]
 pub struct RMSLevels {

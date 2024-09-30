@@ -60,6 +60,7 @@ pub struct Frame {
     pub samples: Vec<f32>,
 }
 
+#[derive(Debug)]
 pub enum InputError {
     DeviceClosed,
     StreamEnded,
@@ -163,5 +164,81 @@ impl Input for InputDevice {
             Err(TryRecvError::Empty) => Ok(None),
             Err(TryRecvError::Closed) => Err(InputError::DeviceClosed),
         }
+    }
+}
+
+/// Implements Input for an iterator that returns samples for a single channel
+/// (i.e. accumulates those results into `Frame`s).
+/// Assumes that once the iterator is exhausted, it will never return more
+/// results.
+pub struct IteratorInput {
+    iter: Box<dyn Iterator<Item = f32>>,
+    sample_rate: SampleRate,
+    frame_len: usize,
+}
+
+impl IteratorInput {
+    // Smallish for tests that want to use small buffers; it probably doesn't
+    // really matter what this is set to most of the time
+    pub const DEFAULT_FRAME_LEN: usize = 16;
+
+    pub fn new(
+        iter: Box<dyn Iterator<Item = f32>>,
+        sample_rate: SampleRate,
+        frame_len: usize,
+    ) -> IteratorInput {
+        IteratorInput {
+            iter,
+            sample_rate,
+            frame_len,
+        }
+    }
+
+    pub fn with_frame_len(mut self, new_len: usize) -> Self {
+        self.frame_len = new_len;
+        self
+    }
+}
+
+impl Input for IteratorInput {
+    fn try_next(&mut self) -> Result<Option<Frame>, InputError> {
+        let mut res = Frame {
+            channels: ChannelCount::new(1),
+            sample_rate: self.sample_rate,
+            samples: Vec::new(),
+        };
+        for _ in 0..self.frame_len {
+            match self.iter.next() {
+                Some(s) => res.samples.push(s),
+                None => return Ok(None),
+            }
+        }
+        Ok(Some(res))
+    }
+    fn next(&mut self) -> Result<Frame, InputError> {
+        match self.try_next() {
+            Ok(Some(f)) => Ok(f),
+            Ok(None) => Err(InputError::StreamEnded),
+            Err(e) => Err(e),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_iter_input() {
+        let mut input = IteratorInput::new(
+            Box::new((0..8).map(|i| i as f32)),
+            SampleRate::new(44100),
+            4,
+        );
+        let f = input.next().unwrap();
+        assert_eq!(f.samples, [0., 1., 2., 3.]);
+        let f = input.next().unwrap();
+        assert_eq!(f.samples, [4., 5., 6., 7.]);
+        assert!(input.next().is_err());
     }
 }

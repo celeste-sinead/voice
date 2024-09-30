@@ -25,6 +25,24 @@ impl From<Decibels> for f32 {
 mod tests {
     use super::*;
 
+    use crate::stream::buffer::BufferedInput;
+    use crate::stream::input::SampleRate;
+    use crate::synth;
+
+    #[test]
+    fn test_rms() {
+        assert_relative_eq!(
+            rms(
+                &BufferedInput::new(synth::sin(SampleRate::new(100), 1., 0.), 100)
+                    .unwrap()
+                    .next()
+                    .unwrap()
+                    .get_channel(0)
+            ),
+            1.0 / 2f32.sqrt()
+        )
+    }
+
     #[test]
     fn db_from_full_scale() {
         assert_eq!(Decibels::from_full_scale(0.1), Decibels(-10.))
