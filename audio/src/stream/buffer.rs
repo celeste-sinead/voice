@@ -11,7 +11,7 @@ use super::input::{ChannelCount, Frame, SampleRate};
 ///   we want to do will want to operate on contiguous data for each channel
 /// - allow us to adapt from whatever buffer size the device is using to
 ///   whatever period we want to use for processing (e.g. for FFTs)
-pub struct InputBuffer {
+pub struct SampleBuffer {
     max_len: usize,
     channels: ChannelCount,
     sample_rate: SampleRate,
@@ -19,15 +19,15 @@ pub struct InputBuffer {
     sample_count: usize,
 }
 
-impl InputBuffer {
-    pub fn new(channels: ChannelCount, sample_rate: SampleRate, max_len: usize) -> InputBuffer {
+impl SampleBuffer {
+    pub fn new(channels: ChannelCount, sample_rate: SampleRate, max_len: usize) -> SampleBuffer {
         let mut buffers = Vec::new();
         for _ in 0..usize::from(channels) {
             let mut b = VecDeque::new();
             b.reserve_exact(max_len);
             buffers.push(b);
         }
-        InputBuffer {
+        SampleBuffer {
             max_len,
             channels,
             sample_rate,
@@ -59,7 +59,7 @@ impl InputBuffer {
 }
 
 #[cfg(test)]
-impl InputBuffer {
+impl SampleBuffer {
     /// Peek at the last n samples in the more recent segment of the ring
     /// buffer, returning fewer if n are not available.
     fn peek_tail(&self, channel: usize, n: usize) -> &[f32] {
@@ -74,9 +74,9 @@ impl InputBuffer {
     }
 }
 
-/// A reference to a contiguous sequence of samples in an InputBuffer
+/// A reference to a contiguous sequence of samples in an SampleBuffer
 pub struct Period<'a> {
-    buffer: &'a InputBuffer,
+    buffer: &'a SampleBuffer,
     start_sample_num: usize,
     len: usize,
 }
@@ -146,22 +146,22 @@ impl<'a> ChannelPeriod<'a> {
     }
 }
 
-/// Produces a stream of periods, as they become available in an InputBuffer
-pub struct PeriodStream {
-    buffer: InputBuffer,
+/// Produces a stream of periods, as they become available in an SampleBuffer
+pub struct PeriodBuffer {
+    buffer: SampleBuffer,
     period_len: usize,
     period_stride: usize,
     next_period_end: usize,
 }
 
-impl PeriodStream {
+impl PeriodBuffer {
     /// A stream of Periods of length period_len, with the start/end advancing
     /// by period_stride for each subsequent period. (if the stride is less than
     /// the length, periods will overlap).
-    pub fn new(buffer: InputBuffer, period_len: usize, period_stride: usize) -> PeriodStream {
+    pub fn new(buffer: SampleBuffer, period_len: usize, period_stride: usize) -> PeriodBuffer {
         // the buffer must initially contain the first sample:
         assert!(buffer.sample_count <= buffer.max_len);
-        PeriodStream {
+        PeriodBuffer {
             buffer,
             period_len,
             period_stride,
@@ -174,9 +174,6 @@ impl PeriodStream {
     }
 
     /// Get the next available Period, if any
-    /// Note that this is intentionally not implementing Iterator, because the
-    /// PeriodStream should not be consumed, because it may return additional
-    /// Periods once more frames are pushed.
     pub fn next(&mut self) -> Option<Period> {
         if self.next_period_end <= self.buffer.sample_count {
             let period = Period {
@@ -198,8 +195,8 @@ mod tests {
 
     #[test]
     fn deinterlacing() {
-        let mut buf: InputBuffer =
-            InputBuffer::new(ChannelCount::new(2), SampleRate::new(44100), 100);
+        let mut buf: SampleBuffer =
+            SampleBuffer::new(ChannelCount::new(2), SampleRate::new(44100), 100);
         buf.push(&Frame {
             channels: ChannelCount::new(2),
             sample_rate: SampleRate::new(44100),
@@ -211,8 +208,8 @@ mod tests {
 
     #[test]
     fn wrap_around() {
-        let mut buf: InputBuffer =
-            InputBuffer::new(ChannelCount::new(1), SampleRate::new(44100), 4);
+        let mut buf: SampleBuffer =
+            SampleBuffer::new(ChannelCount::new(1), SampleRate::new(44100), 4);
         // Add 3 1's, almost filling the max length of 4
         buf.push(&Frame {
             channels: ChannelCount::new(1),
@@ -236,8 +233,8 @@ mod tests {
 
     #[test]
     fn basic_period_stream() {
-        let mut stream = PeriodStream::new(
-            InputBuffer::new(ChannelCount::new(1), SampleRate::new(44100), 100),
+        let mut stream = PeriodBuffer::new(
+            SampleBuffer::new(ChannelCount::new(1), SampleRate::new(44100), 100),
             4,
             2,
         );
@@ -283,8 +280,8 @@ mod tests {
     #[test]
     fn periods_split_ring() {
         // Fill an 8-sample ring buffer (but don't wrap yet)
-        let mut stream = PeriodStream::new(
-            InputBuffer::new(ChannelCount::new(1), SampleRate::new(44100), 8),
+        let mut stream = PeriodBuffer::new(
+            SampleBuffer::new(ChannelCount::new(1), SampleRate::new(44100), 8),
             4,
             2,
         );

@@ -2,7 +2,7 @@ use std::thread;
 
 use async_channel::Sender;
 
-use super::buffer::{InputBuffer, PeriodStream};
+use super::buffer::{PeriodBuffer, SampleBuffer};
 use super::input::{ChannelCount, Frame, Input, InputDevice, SampleRate};
 use super::wav::WavWriter;
 use crate::{dsp, Message, RMSLevels};
@@ -16,7 +16,7 @@ pub struct Executor {
     channels: ChannelCount,
     sample_rate: SampleRate,
     writer: WavWriter,
-    periods: PeriodStream,
+    periods: PeriodBuffer,
     sender: Sender<Message>,
 }
 
@@ -34,8 +34,8 @@ impl Executor {
             channels,
             sample_rate,
             writer: WavWriter::new(channels, sample_rate),
-            periods: PeriodStream::new(
-                InputBuffer::new(channels, sample_rate, usize::from(sample_rate) * 2),
+            periods: PeriodBuffer::new(
+                SampleBuffer::new(channels, sample_rate, usize::from(sample_rate) * 2),
                 usize::from(sample_rate) / 10,
                 usize::from(sample_rate) / 10,
             ),
