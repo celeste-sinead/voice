@@ -1,0 +1,3 @@
+# Don't include Jupyter notebooks in line count; they're mostly filled with
+# generated SVGs :3
+*.ipynb linguist-generated
