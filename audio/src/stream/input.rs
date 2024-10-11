@@ -25,7 +25,7 @@ impl From<ChannelCount> for usize {
     }
 }
 
-#[derive(PartialEq, Eq, Copy, Clone)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct SampleRate(u32);
 
 impl SampleRate {

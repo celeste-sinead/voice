@@ -159,6 +159,10 @@ impl<'a> ChannelPeriod<'a> {
         self.len
     }
 
+    pub fn sample_rate(&self) -> SampleRate {
+        self.sample_rate
+    }
+
     pub fn into_timeseries(self) -> TimeseriesIterator<'a> {
         TimeseriesIterator {
             period: self,
