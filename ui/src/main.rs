@@ -14,11 +14,12 @@ mod mandelbrot;
 
 use audio::stream::executor::{Executor, CHANNEL_MAX};
 use audio::stream::input::{ChannelCount, SampleRate};
+use audio::stream::Instant;
 use audio::Message;
 use levels::LevelsChart;
 
 struct Counter {
-    time: Duration,
+    time: Instant,
     rms_levels: Vec<f32>,
     _audio_thread: JoinHandle<()>,
     audio_messages: Receiver<Message>,
@@ -65,7 +66,7 @@ impl Application for Counter {
 
         (
             Counter {
-                time: Duration::default(),
+                time: Instant::default(),
                 rms_levels: Vec::new(),
                 _audio_thread: executor.start(),
                 audio_messages,

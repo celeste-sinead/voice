@@ -1,7 +1,7 @@
 //! Tools for prototyping in a Jupyter notebook
 //! The idea is that a notebook can just import this and be unlikely to need
 //! anything else, i.e. start with:
-//! ```rust
+//! ```ipynb
 //! :dep notebook = { path = "." }
 //! use notebook::*;
 //! ```

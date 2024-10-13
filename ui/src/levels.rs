@@ -6,13 +6,14 @@ use iced::{Element, Length};
 use plotters_iced::{Chart, ChartBuilder, ChartWidget, DrawingBackend};
 
 use audio::dsp::Decibels;
+use audio::stream::input::Instant;
 use audio::{Message, RMSLevels};
 
 pub struct LevelsChart {
     /// The width of the chart
     max_history: Duration,
     /// The time value for each point
-    times: VecDeque<Duration>,
+    times: VecDeque<Instant>,
     /// By channel, series of levels (dBFS), corresponding to each time
     levels: Vec<VecDeque<Decibels>>,
 }
@@ -23,12 +24,8 @@ impl Chart<Message> for LevelsChart {
     fn build_chart<DB: DrawingBackend>(&self, _state: &Self::State, mut builder: ChartBuilder<DB>) {
         use plotters::prelude::*;
 
-        let tmin = self.times.front().unwrap_or(&Duration::ZERO).as_secs_f32();
-        let tmax = self
-            .times
-            .back()
-            .unwrap_or(&Duration::ZERO)
-            .as_secs_f32()
+        let tmin = f32::from(*self.times.front().unwrap_or(&Instant::ZERO));
+        let tmax = f32::from(*self.times.back().unwrap_or(&Instant::ZERO))
             .max(self.max_history.as_secs_f32());
 
         let mut chart = builder
@@ -45,7 +42,7 @@ impl Chart<Message> for LevelsChart {
         for (i, (ch, color)) in zip(&self.levels, [BLUE, GREEN, RED, CYAN]).enumerate() {
             chart
                 .draw_series(LineSeries::new(
-                    zip(&self.times, ch).map(|(t, rms)| (t.as_secs_f32(), f32::from(*rms))),
+                    zip(&self.times, ch).map(|(t, rms)| (f32::from(*t), f32::from(*rms))),
                     color,
                 ))
                 .expect("draw series")
@@ -104,14 +101,10 @@ impl LevelsChart {
         }
 
         // Truncate the beginning of history as it ages out
-        if message.time > self.max_history {
-            // (avoid underflow..)
-            let new_start = message.time - self.max_history;
-            while self.times.front().unwrap() < &new_start {
-                self.times.pop_front();
-                for ch in &mut self.levels {
-                    ch.pop_front();
-                }
+        while message.time - *self.times.front().unwrap() > self.max_history {
+            self.times.pop_front();
+            for ch in &mut self.levels {
+                ch.pop_front();
             }
         }
     }

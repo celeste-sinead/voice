@@ -4,71 +4,8 @@ use async_channel::{Receiver, TryRecvError, TrySendError};
 use cpal;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
-#[derive(PartialEq, Eq, Copy, Clone)]
-pub struct ChannelCount(u16);
-
-impl ChannelCount {
-    pub fn new(c: u16) -> ChannelCount {
-        ChannelCount(c)
-    }
-}
-
-impl From<ChannelCount> for u16 {
-    fn from(v: ChannelCount) -> u16 {
-        v.0
-    }
-}
-
-impl From<ChannelCount> for usize {
-    fn from(v: ChannelCount) -> usize {
-        v.0 as usize
-    }
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct SampleRate(u32);
-
-impl SampleRate {
-    pub fn new(s: u32) -> SampleRate {
-        SampleRate(s)
-    }
-}
-
-impl From<SampleRate> for u32 {
-    fn from(v: SampleRate) -> u32 {
-        v.0
-    }
-}
-
-impl From<SampleRate> for usize {
-    fn from(v: SampleRate) -> usize {
-        v.0 as usize
-    }
-}
-
-impl From<SampleRate> for f32 {
-    fn from(v: SampleRate) -> f32 {
-        v.0 as f32
-    }
-}
-
-/// Represents a point in time, in seconds, in a signal
-/// Essentially the same as std::time::Instant, but the latter is unusably
-/// opaque.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Instant(f32);
-
-impl Instant {
-    pub fn from_sample_num(sample: usize, rate: SampleRate) -> Instant {
-        Instant(sample as f32 / f32::from(rate))
-    }
-}
-
-impl From<Instant> for f32 {
-    fn from(v: Instant) -> f32 {
-        v.0 as f32
-    }
-}
+// TODO: move other users to use the new location of these:
+pub use super::{ChannelCount, Instant, SampleRate};
 
 /// A batch of samples received from an input device.
 /// If multi-channel, these will be interlaced (I think lol)
