@@ -1,7 +1,7 @@
 [workspace]
 
 members = [
-    "audio",
+    "audio", "charts",
     "notebook",
     "ui",
 ]
