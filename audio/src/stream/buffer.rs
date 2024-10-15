@@ -133,6 +133,14 @@ impl<'a> Period<'a> {
             .collect()
     }
 
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    pub fn sample_rate(&self) -> SampleRate {
+        self.buffer.sample_rate
+    }
+
     pub fn start_time(&self) -> Instant {
         Instant::from_sample_num(self.start_sample_num, self.buffer.sample_rate)
     }

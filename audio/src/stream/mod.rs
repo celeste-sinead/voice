@@ -4,6 +4,7 @@ use std::time::Duration;
 pub mod buffer;
 pub mod executor;
 pub mod input;
+pub mod transform;
 pub mod wav;
 
 #[derive(PartialEq, Eq, Copy, Clone)]

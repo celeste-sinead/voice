@@ -1,5 +1,4 @@
 use std::thread::JoinHandle;
-use std::time::Duration;
 
 use async_channel;
 use async_channel::Receiver;
@@ -9,6 +8,7 @@ use iced::subscription;
 use iced::widget;
 use iced::{Application, Command, Element, Length, Padding, Settings, Subscription, Theme};
 
+mod frequencies;
 mod levels;
 mod mandelbrot;
 
@@ -16,14 +16,14 @@ use audio::stream::executor::{Executor, CHANNEL_MAX};
 use audio::stream::input::{ChannelCount, SampleRate};
 use audio::stream::Instant;
 use audio::Message;
-use levels::LevelsChart;
+use frequencies::FrequenciesChart;
 
 struct Counter {
     time: Instant,
     rms_levels: Vec<f32>,
     _audio_thread: JoinHandle<()>,
     audio_messages: Receiver<Message>,
-    levels: LevelsChart,
+    frequencies: FrequenciesChart,
 }
 
 #[derive(Hash)]
@@ -70,7 +70,7 @@ impl Application for Counter {
                 rms_levels: Vec::new(),
                 _audio_thread: executor.start(),
                 audio_messages,
-                levels: LevelsChart::new(Duration::from_secs(30)),
+                frequencies: FrequenciesChart::new(),
             },
             Command::none(),
         )
@@ -83,7 +83,7 @@ impl Application for Counter {
     fn view(&self) -> Element<Message> {
         // Wrap the UI in a Container that can be configured to fill whatever
         // the current window size is, and lay out children to use that space
-        widget::Container::new(widget::column![self.levels.view(),])
+        widget::Container::new(widget::column![self.frequencies.view(),])
             .width(Length::Fill)
             .height(Length::Fill)
             .padding(Padding::new(5.))
@@ -95,7 +95,10 @@ impl Application for Counter {
             Message::RMSLevels(l) => {
                 self.rms_levels = l.values.clone();
                 self.time = l.time;
-                self.levels.update(l);
+            }
+            Message::FFTResult(f) => {
+                self.time = f.end_time;
+                self.frequencies.update(f);
             }
             Message::AudioStreamClosed => todo!(),
         };

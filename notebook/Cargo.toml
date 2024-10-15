@@ -5,5 +5,6 @@ edition = "2021"
 
 [dependencies]
 audio = { version = "0.1.0", path = "../audio" }
+charts = { version = "0.1.0", path = "../charts" }
 num-complex = "0.4.6"
 plotters = { version = "0.3.6", features = ["evcxr"] }

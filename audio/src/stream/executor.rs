@@ -4,6 +4,7 @@ use async_channel::Sender;
 
 use super::buffer::{PeriodBuffer, SampleBuffer};
 use super::input::{ChannelCount, Frame, Input, InputDevice, SampleRate};
+use super::transform::FFT;
 use super::wav::WavWriter;
 use crate::{dsp, Message, RMSLevels};
 
@@ -17,6 +18,7 @@ pub struct Executor {
     sample_rate: SampleRate,
     writer: WavWriter,
     periods: PeriodBuffer,
+    fft: FFT,
     sender: Sender<Message>,
 }
 
@@ -36,9 +38,10 @@ impl Executor {
             writer: WavWriter::new(channels, sample_rate),
             periods: PeriodBuffer::new(
                 SampleBuffer::new(channels, sample_rate, usize::from(sample_rate) * 2),
-                usize::from(sample_rate) / 10,
-                usize::from(sample_rate) / 10,
+                8192,
+                8192,
             ),
+            fft: FFT::new(8192),
             sender,
         }
     }
@@ -49,6 +52,7 @@ impl Executor {
         self.writer.push(frame).expect("session.wav write error");
         self.periods.push(frame);
         while let Some(p) = self.periods.next() {
+            res.push(Message::FFTResult(self.fft.transform(&p)));
             res.push(Message::RMSLevels(RMSLevels {
                 time: p.start_time(),
                 values: p.channels().into_iter().map(|c| dsp::rms(&c)).collect(),

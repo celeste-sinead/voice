@@ -7,6 +7,7 @@ pub mod stream;
 pub mod synth;
 
 use stream::input::Instant;
+pub use stream::transform::FFTResult;
 
 #[derive(Clone, Debug)]
 pub struct RMSLevels {
@@ -19,6 +20,7 @@ pub struct RMSLevels {
 // The message type that is used to update iced application state
 #[derive(Debug, Clone)]
 pub enum Message {
-    RMSLevels(RMSLevels),
     AudioStreamClosed,
+    FFTResult(FFTResult),
+    RMSLevels(RMSLevels),
 }

@@ -60,6 +60,7 @@ impl Chart<Message> for LevelsChart {
     }
 }
 
+#[allow(dead_code)]
 impl LevelsChart {
     pub fn new(max_history: Duration) -> LevelsChart {
         LevelsChart {
