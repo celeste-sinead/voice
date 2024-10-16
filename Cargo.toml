@@ -1,8 +1,9 @@
 [workspace]
 
 members = [
-    "audio", "charts",
+    "analyzer_app",
+    "audio",
+    "charts",
     "notebook",
-    "ui",
 ]
 resolver = "2"
