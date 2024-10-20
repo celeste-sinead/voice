@@ -5,15 +5,7 @@ use cpal;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
 // TODO: move other users to use the new location of these:
-pub use super::{ChannelCount, Instant, SampleRate};
-
-/// A batch of samples received from an input device.
-/// If multi-channel, these will be interlaced (I think lol)
-pub struct Frame {
-    pub channels: ChannelCount,
-    pub sample_rate: SampleRate,
-    pub samples: Vec<f32>,
-}
+pub use super::{ChannelCount, Frame, Instant, SampleRate};
 
 #[derive(Debug)]
 pub enum InputError {
@@ -37,8 +29,6 @@ pub struct InputDevice {
 
 impl InputDevice {
     pub fn new(channels: ChannelCount, sample_rate: SampleRate) -> InputDevice {
-        // TODO: these should be parameters. If they were generic constants
-        // the type system could enforce that later processing steps match.
         let host = cpal::default_host();
         // TODO: some way of selecting from available devices?
         let device = host.default_input_device().unwrap();

@@ -4,6 +4,6 @@ members = [
     "analyzer_app",
     "audio",
     "charts",
-    "notebook",
+    "notebook", "synth_app",
 ]
 resolver = "2"

@@ -1,9 +1,13 @@
 use std::ops::{Add, Sub};
 use std::time::Duration;
 
+use cpal;
+
 pub mod buffer;
 pub mod executor;
 pub mod input;
+pub mod output;
+pub mod pipeline;
 pub mod transform;
 pub mod wav;
 
@@ -55,6 +59,12 @@ impl From<SampleRate> for f32 {
     }
 }
 
+impl From<SampleRate> for cpal::SampleRate {
+    fn from(v: SampleRate) -> cpal::SampleRate {
+        cpal::SampleRate(v.0)
+    }
+}
+
 /// Represents a point in time, in seconds, in a signal
 /// Essentially the same as std::time::Instant, but the latter is unusably
 /// opaque.
@@ -103,4 +113,11 @@ impl Sub<Duration> for Instant {
     fn sub(self, rhs: Duration) -> Instant {
         Instant(self.0 - rhs.as_secs_f32())
     }
+}
+
+/// A batch of samples received from an input device.
+pub struct Frame {
+    pub channels: ChannelCount,
+    pub sample_rate: SampleRate,
+    pub samples: Vec<f32>,
 }

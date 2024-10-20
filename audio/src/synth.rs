@@ -28,13 +28,19 @@ impl Iterator for SampleClock {
     }
 }
 
+pub fn sin_iter(
+    sample_rate: SampleRate,
+    frequency: f32,
+    phase: f32,
+) -> Box<dyn Iterator<Item = f32>> {
+    Box::new(SampleClock::new(sample_rate).map(move |t| (2. * PI * frequency * t + phase).sin()))
+}
+
 /// Return an Input that produces an infinite sinusoid
 /// frequency is in Hz, phase is in radians
 pub fn sin(sample_rate: SampleRate, frequency: f32, phase: f32) -> IteratorInput {
     IteratorInput::new(
-        Box::new(
-            SampleClock::new(sample_rate).map(move |t| (2. * PI * frequency * t + phase).sin()),
-        ),
+        sin_iter(sample_rate, frequency, phase),
         sample_rate,
         IteratorInput::DEFAULT_FRAME_LEN,
     )
