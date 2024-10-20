@@ -1,9 +1,20 @@
 [workspace]
-
 members = [
     "analyzer_app",
     "audio",
     "charts",
-    "notebook", "synth_app",
+    "notebook",
+    "synth_app",
 ]
 resolver = "2"
+
+[workspace.dependencies]
+audio = { path = "audio" }
+charts = { path = "charts" }
+
+async-channel = "2.3"
+futures = "0.3"
+iced = { version = "0.13", features = ["advanced", "canvas"] }
+num-complex = "0.4"
+plotters = { version = "0.3", features = ["evcxr"] }
+plotters-iced = "0.11"

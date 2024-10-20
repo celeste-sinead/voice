@@ -3,10 +3,8 @@ use std::thread::JoinHandle;
 use async_channel;
 use async_channel::Receiver;
 use clap::Parser;
-use iced::executor;
-use iced::subscription;
-use iced::widget;
-use iced::{Application, Command, Element, Length, Padding, Settings, Subscription, Theme};
+use futures::sink::SinkExt;
+use iced::{widget, Element, Length, Padding, Subscription};
 
 mod frequencies;
 mod levels;
@@ -17,19 +15,6 @@ use audio::stream::input::{ChannelCount, SampleRate};
 use audio::stream::Instant;
 use audio::Message;
 use frequencies::FrequenciesChart;
-
-struct Counter {
-    time: Instant,
-    rms_levels: Vec<f32>,
-    _audio_thread: JoinHandle<()>,
-    audio_messages: Receiver<Message>,
-    frequencies: FrequenciesChart,
-}
-
-#[derive(Hash)]
-enum SubscriptionId {
-    AudioInput,
-}
 
 #[derive(Debug, Parser)]
 struct Args {
@@ -50,13 +35,21 @@ impl Default for Args {
     }
 }
 
-impl Application for Counter {
-    type Executor = executor::Default;
-    type Flags = Args;
-    type Message = Message;
-    type Theme = Theme;
+struct Analyzer {
+    time: Instant,
+    rms_levels: Vec<f32>,
+    _audio_thread: JoinHandle<()>,
+    audio_messages: Receiver<Message>,
+    frequencies: FrequenciesChart,
+}
 
-    fn new(args: Args) -> (Counter, Command<Message>) {
+#[derive(Hash)]
+enum SubscriptionId {
+    AudioInput,
+}
+
+impl Analyzer {
+    fn new(args: Args) -> Analyzer {
         let (sender, audio_messages) = async_channel::bounded(CHANNEL_MAX);
         let executor = Executor::new(
             sender,
@@ -64,71 +57,68 @@ impl Application for Counter {
             SampleRate::new(args.sample_rate),
         );
 
-        (
-            Counter {
-                time: Instant::default(),
-                rms_levels: Vec::new(),
-                _audio_thread: executor.start(),
-                audio_messages,
-                frequencies: FrequenciesChart::new(),
-            },
-            Command::none(),
-        )
-    }
-
-    fn title(&self) -> String {
-        String::from("Gay gay homosexual gay") // hehe :3
-    }
-
-    fn view(&self) -> Element<Message> {
-        // Wrap the UI in a Container that can be configured to fill whatever
-        // the current window size is, and lay out children to use that space
-        widget::Container::new(widget::column![self.frequencies.view(),])
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .padding(Padding::new(5.))
-            .into()
-    }
-
-    fn update(&mut self, message: Message) -> Command<Message> {
-        match message {
-            Message::RMSLevels(l) => {
-                self.rms_levels = l.values.clone();
-                self.time = l.time;
-            }
-            Message::FFTResult(f) => {
-                self.time = f.end_time;
-                self.frequencies.update(f);
-            }
-            Message::AudioStreamClosed => todo!(),
-        };
-        Command::none()
-    }
-
-    fn subscription(&self) -> Subscription<Message> {
-        subscription::unfold(
-            SubscriptionId::AudioInput,
-            self.audio_messages.clone(),
-            |receiver| async {
-                let msg = match receiver.recv().await {
-                    Ok(m) => m,
-                    Err(_) => Message::AudioStreamClosed,
-                };
-                (msg, receiver)
-            },
-        )
+        Analyzer {
+            time: Instant::default(),
+            rms_levels: Vec::new(),
+            _audio_thread: executor.start(),
+            audio_messages,
+            frequencies: FrequenciesChart::new(),
+        }
     }
 }
 
+fn update(state: &mut Analyzer, message: Message) {
+    match message {
+        Message::RMSLevels(l) => {
+            state.rms_levels = l.values.clone();
+            state.time = l.time;
+        }
+        Message::FFTResult(f) => {
+            state.time = f.end_time;
+            state.frequencies.update(f);
+        }
+        Message::AudioStreamClosed => todo!(),
+    };
+}
+
+fn view(state: &Analyzer) -> Element<Message> {
+    // Wrap the UI in a Container that can be configured to fill whatever
+    // the current window size is, and lay out children to use that space
+    widget::Container::new(widget::column![state.frequencies.view(),])
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .padding(Padding::new(5.))
+        .into()
+}
+
+fn subscription(state: &Analyzer) -> Subscription<Message> {
+    let audio_messages = state.audio_messages.clone();
+    Subscription::run_with_id(
+        SubscriptionId::AudioInput,
+        iced::stream::channel(
+            4, // maximum messages waiting in channel
+            |mut output| async move {
+                loop {
+                    match audio_messages.recv().await {
+                        Ok(m) => output.send(m).await.unwrap(),
+                        Err(_) => {
+                            output.send(Message::AudioStreamClosed).await.unwrap();
+                            return;
+                        }
+                    }
+                }
+            },
+        ),
+    )
+}
+
 fn main() -> iced::Result {
-    let args = Args::parse();
-    Counter::run(Settings {
-        flags: args,
+    iced::application("Formant Analyzer", update, view)
         // This is an unreliable work-around for a bug with nvidia's linux
         // vulkan drivers, apparently, see
         // https://github.com/iced-rs/iced/issues/2314
         // If it doesn't work, try setting environment (source env.sh)
-        antialiasing: true,
-        ..Settings::default()
-    })
+        .antialiasing(true)
+        .subscription(subscription)
+        .run_with(|| (Analyzer::new(Args::parse()), iced::Task::none()))
 }
