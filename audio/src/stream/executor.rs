@@ -1,11 +1,15 @@
 use std::thread;
 
-use async_channel::Sender;
+use async_channel::{Receiver, Sender, TryRecvError};
 
 use super::buffer::{PeriodBuffer, SampleBuffer};
-use super::input::{ChannelCount, Frame, Input, InputDevice, SampleRate};
+use super::input::{Input, InputDevice};
+use super::output::OutputDevice;
+use super::pipeline::{Pipeline, Step};
 use super::transform::FFT;
 use super::wav::WavWriter;
+use super::{ChannelCount, Frame, SampleRate};
+use crate::dsp::Decibels;
 use crate::{dsp, Message, RMSLevels};
 
 // The maximum length of channels passing audio data amongst threads
@@ -90,5 +94,59 @@ impl Executor {
             let input = InputDevice::new(self.channels, self.sample_rate);
             self.run(input);
         })
+    }
+}
+
+#[derive(Debug)]
+pub enum Request {
+    SetGain(Decibels),
+}
+
+#[derive(Debug)]
+pub struct Response();
+
+/// TODO: this should be merged with Executor
+pub struct PipelineExecutor<I: Input, S: Step<Input = Frame, Output = Frame>> {
+    pipeline: Pipeline<I, S, OutputDevice>,
+    receiver: Receiver<Request>,
+}
+
+impl<I: Input + Send + 'static, S: Step<Input = Frame, Output = Frame> + Send + 'static>
+    PipelineExecutor<I, S>
+{
+    pub fn new(
+        channels: ChannelCount,
+        sample_rate: SampleRate,
+        input: I,
+        step: S,
+    ) -> (Sender<Request>, Receiver<Response>, thread::JoinHandle<()>) {
+        let (req_send, req_recv) = async_channel::bounded(CHANNEL_MAX);
+        let (_msg_send, msg_recv) = async_channel::bounded(CHANNEL_MAX);
+        (
+            req_send,
+            msg_recv,
+            thread::spawn(move || {
+                let mut executor = PipelineExecutor {
+                    pipeline: Pipeline::new(
+                        input,
+                        step,
+                        OutputDevice::new(channels, sample_rate).unwrap(),
+                    ),
+                    receiver: req_recv,
+                };
+                executor.run();
+            }),
+        )
+    }
+
+    fn run(&mut self) {
+        loop {
+            match self.receiver.try_recv() {
+                Ok(req) => println!("Got Request: {:?}", req),
+                Err(TryRecvError::Empty) => (),
+                Err(_) => todo!(),
+            }
+            self.pipeline.process_once().unwrap();
+        }
     }
 }

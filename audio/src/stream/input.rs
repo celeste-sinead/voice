@@ -116,22 +116,18 @@ impl Input for InputDevice {
 /// (i.e. accumulates those results into `Frame`s).
 /// Assumes that once the iterator is exhausted, it will never return more
 /// results.
-pub struct IteratorInput {
-    iter: Box<dyn Iterator<Item = f32>>,
+pub struct IteratorInput<I: Iterator<Item = f32>> {
+    iter: I,
     sample_rate: SampleRate,
     frame_len: usize,
 }
 
-impl IteratorInput {
+impl<I: Iterator<Item = f32>> IteratorInput<I> {
     // Smallish for tests that want to use small buffers; it probably doesn't
     // really matter what this is set to most of the time
     pub const DEFAULT_FRAME_LEN: usize = 16;
 
-    pub fn new(
-        iter: Box<dyn Iterator<Item = f32>>,
-        sample_rate: SampleRate,
-        frame_len: usize,
-    ) -> IteratorInput {
+    pub fn new(iter: I, sample_rate: SampleRate, frame_len: usize) -> IteratorInput<I> {
         IteratorInput {
             iter,
             sample_rate,
@@ -145,7 +141,7 @@ impl IteratorInput {
     }
 }
 
-impl Input for IteratorInput {
+impl<I: Iterator<Item = f32>> Input for IteratorInput<I> {
     fn try_next(&mut self) -> Result<Option<Frame>, InputError> {
         let mut res = Frame {
             channels: ChannelCount::new(1),

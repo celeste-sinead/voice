@@ -1,4 +1,6 @@
 use std::f32::consts::PI;
+use std::fmt;
+use std::fmt::{Display, Formatter};
 use std::iter::zip;
 use std::sync::Arc;
 
@@ -15,12 +17,22 @@ pub fn rms(period: &ChannelPeriod) -> f32 {
     mean_sq.sqrt()
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub struct Decibels(f32);
 
 impl Decibels {
+    pub fn new(db: f32) -> Decibels {
+        Decibels(db)
+    }
     pub fn from_full_scale(fs: f32) -> Decibels {
         Decibels(10. * fs.log10())
+    }
+}
+
+impl Display for Decibels {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
+        self.0.fmt(f)?;
+        f.write_str("dB")
     }
 }
 

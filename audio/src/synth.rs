@@ -28,21 +28,40 @@ impl Iterator for SampleClock {
     }
 }
 
-pub fn sin_iter(
-    sample_rate: SampleRate,
+pub struct SinIterator {
     frequency: f32,
     phase: f32,
-) -> Box<dyn Iterator<Item = f32>> {
-    Box::new(SampleClock::new(sample_rate).map(move |t| (2. * PI * frequency * t + phase).sin()))
+    clock: SampleClock,
+}
+
+impl SinIterator {
+    pub fn new(sample_rate: SampleRate, frequency: f32, phase: f32) -> SinIterator {
+        SinIterator {
+            frequency,
+            phase,
+            clock: SampleClock::new(sample_rate),
+        }
+    }
+}
+
+impl Iterator for SinIterator {
+    type Item = f32;
+
+    fn next(&mut self) -> Option<f32> {
+        match self.clock.next() {
+            Some(t) => Some((2. * PI * self.frequency * t + self.phase).sin()),
+            None => panic!("impossible, clock is infinite"),
+        }
+    }
 }
 
 /// Return an Input that produces an infinite sinusoid
 /// frequency is in Hz, phase is in radians
-pub fn sin(sample_rate: SampleRate, frequency: f32, phase: f32) -> IteratorInput {
+pub fn sin(sample_rate: SampleRate, frequency: f32, phase: f32) -> IteratorInput<SinIterator> {
     IteratorInput::new(
-        sin_iter(sample_rate, frequency, phase),
+        SinIterator::new(sample_rate, frequency, phase),
         sample_rate,
-        IteratorInput::DEFAULT_FRAME_LEN,
+        IteratorInput::<SinIterator>::DEFAULT_FRAME_LEN,
     )
 }
 

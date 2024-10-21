@@ -36,8 +36,9 @@ impl OutputDevice {
     /// samples.
     /// Empirically, ALSA doesn't respect this very well, although it does seem
     /// to have _some_ influence
-    /// 256 samples at 44.1kHz ~= 6ms
-    pub const DEVICE_BUFFER: cpal::FrameCount = 256;
+    /// I observed some crackling when this was set to 256...
+    /// 512 samples at 44.1kHz ~= 12ms
+    pub const DEVICE_BUFFER: cpal::FrameCount = 512;
 
     /// The max number of `Frame`s waiting to be output.
     /// In the common cases (playback from file, synthesis) samples can be
