@@ -66,7 +66,7 @@ impl Executor {
     }
 
     /// The main loop of the audio processing thread
-    fn run<T: Input>(mut self, mut input: T) {
+    fn run<T: Input<Item = Frame>>(mut self, mut input: T) {
         loop {
             match input.next() {
                 Ok(f) => {
@@ -106,12 +106,12 @@ pub enum Request {
 pub struct Response();
 
 /// TODO: this should be merged with Executor
-pub struct PipelineExecutor<I: Input, S: Step<Input = Frame, Output = Frame>> {
+pub struct PipelineExecutor<I: Input, S: Step<Input = I::Item, Output = Frame>> {
     pipeline: Pipeline<I, S, OutputDevice>,
     receiver: Receiver<Request>,
 }
 
-impl<I: Input + Send + 'static, S: Step<Input = Frame, Output = Frame> + Send + 'static>
+impl<I: Input + Send + 'static, S: Step<Input = I::Item, Output = Frame> + Send + 'static>
     PipelineExecutor<I, S>
 {
     pub fn new(

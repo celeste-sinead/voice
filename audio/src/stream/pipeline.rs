@@ -20,7 +20,7 @@ pub trait Step {
 /// Encapsulates some audio input, a processing step to transform that input,
 /// and an output to sink the results.
 /// The processing step is generally expected to be a `Chain`
-pub struct Pipeline<I: Input, S: Step<Input = Frame, Output = Frame>, O: Output> {
+pub struct Pipeline<I: Input, S: Step<Input = I::Item, Output = Frame>, O: Output> {
     input: I,
     step: S,
     output: O,
@@ -32,7 +32,7 @@ pub enum ProcessError {
     OutputError(OutputError),
 }
 
-impl<I: Input, S: Step<Input = Frame, Output = Frame>, O: Output> Pipeline<I, S, O> {
+impl<I: Input, S: Step<Input = I::Item, Output = Frame>, O: Output> Pipeline<I, S, O> {
     pub fn new(input: I, step: S, output: O) -> Pipeline<I, S, O> {
         Pipeline {
             input,

@@ -14,8 +14,9 @@ pub enum InputError {
 }
 
 pub trait Input {
-    fn next(&mut self) -> Result<Frame, InputError>;
-    fn try_next(&mut self) -> Result<Option<Frame>, InputError>;
+    type Item;
+    fn next(&mut self) -> Result<Self::Item, InputError>;
+    fn try_next(&mut self) -> Result<Option<Self::Item>, InputError>;
 }
 
 /// Opens a stream from an audio input device, receives sample data callbacks
@@ -96,6 +97,8 @@ impl InputDevice {
 }
 
 impl Input for InputDevice {
+    type Item = Frame;
+
     fn next(&mut self) -> Result<Frame, InputError> {
         match self.frames.recv_blocking() {
             Ok(f) => Ok(f),
@@ -142,6 +145,8 @@ impl<I: Iterator<Item = f32>> IteratorInput<I> {
 }
 
 impl<I: Iterator<Item = f32>> Input for IteratorInput<I> {
+    type Item = Frame;
+
     fn try_next(&mut self) -> Result<Option<Frame>, InputError> {
         let mut res = Frame {
             channels: ChannelCount::new(1),

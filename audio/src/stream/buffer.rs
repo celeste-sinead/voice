@@ -272,12 +272,12 @@ impl PeriodBuffer {
     }
 }
 
-pub struct BufferedInput<T: Input> {
+pub struct BufferedInput<T: Input<Item = Frame>> {
     input: T,
     buffer: PeriodBuffer,
 }
 
-impl<T: Input> BufferedInput<T> {
+impl<T: Input<Item = Frame>> BufferedInput<T> {
     /// The BufferedInput will get its sample rate and channel count from the input
     pub fn new(mut input: T, period_len: usize) -> Result<BufferedInput<T>, InputError> {
         let frame = input.next()?;
