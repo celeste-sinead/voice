@@ -1,6 +1,6 @@
 use std::f32::consts::PI;
 
-use crate::stream::input::{IteratorInput, SampleRate};
+use crate::stream::input::SampleRate;
 
 /// An iterator that returns and infinite sequence of sample times (seconds)
 /// for a given sample rate (which is a useful base for synthesizing signals)
@@ -28,6 +28,7 @@ impl Iterator for SampleClock {
     }
 }
 
+/// An Iterator that produces an infinite sinusoid
 pub struct SinIterator {
     frequency: f32,
     phase: f32,
@@ -35,6 +36,7 @@ pub struct SinIterator {
 }
 
 impl SinIterator {
+    /// frequency is in Hz, phase is in radians
     pub fn new(sample_rate: SampleRate, frequency: f32, phase: f32) -> SinIterator {
         SinIterator {
             frequency,
@@ -55,20 +57,9 @@ impl Iterator for SinIterator {
     }
 }
 
-/// Return an Input that produces an infinite sinusoid
-/// frequency is in Hz, phase is in radians
-pub fn sin(sample_rate: SampleRate, frequency: f32, phase: f32) -> IteratorInput<SinIterator> {
-    IteratorInput::new(
-        SinIterator::new(sample_rate, frequency, phase),
-        sample_rate,
-        IteratorInput::<SinIterator>::DEFAULT_FRAME_LEN,
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::stream::input::Input;
 
     fn assert_samples_eq(left: &Vec<f32>, right: &Vec<f32>) {
         let eq = if left.len() == right.len() {
@@ -86,16 +77,20 @@ mod tests {
 
     #[test]
     fn test_sin() {
-        let mut sin = sin(SampleRate::new(4), 1., 0.).with_frame_len(5);
-        let f = sin.next().unwrap();
-        assert_samples_eq(&f.samples, &vec![0., 1., 0., -1., 0.])
+        let samples: Vec<f32> = SinIterator::new(SampleRate::new(4), 1., 0.)
+            .zip(0..5)
+            .map(|(y, _)| y)
+            .collect();
+        assert_samples_eq(&samples, &vec![0., 1., 0., -1., 0.])
     }
 
     #[test]
     fn test_sin_freq_phase() {
-        let mut sin = sin(SampleRate::new(32), 4., PI / 2.).with_frame_len(4);
-        let f = sin.next().unwrap();
+        let samples: Vec<f32> = SinIterator::new(SampleRate::new(32), 4., PI / 2.)
+            .zip(0..4)
+            .map(|(y, _)| y)
+            .collect();
         let inv_sqrt_2 = 1.0 / 2f32.sqrt();
-        assert_samples_eq(&f.samples, &vec![1., inv_sqrt_2, 0., -inv_sqrt_2])
+        assert_samples_eq(&samples, &vec![1., inv_sqrt_2, 0., -inv_sqrt_2])
     }
 }

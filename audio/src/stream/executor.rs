@@ -68,7 +68,7 @@ impl Executor {
     /// The main loop of the audio processing thread
     fn run<T: Input<Item = Frame>>(mut self, mut input: T) {
         loop {
-            match input.next() {
+            match input.read() {
                 Ok(f) => {
                     for m in self.process(&f) {
                         if let Err(_) = self.sender.send_blocking(m) {
@@ -144,7 +144,10 @@ impl<I: Input + Send + 'static, S: Step<Input = I::Item, Output = Frame> + Send 
             match self.receiver.try_recv() {
                 Ok(req) => println!("Got Request: {:?}", req),
                 Err(TryRecvError::Empty) => (),
-                Err(_) => todo!(),
+                Err(_) => {
+                    println!("Executor: UI exited");
+                    break;
+                }
             }
             self.pipeline.process_once().unwrap();
         }

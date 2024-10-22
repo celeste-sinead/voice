@@ -42,7 +42,7 @@ impl<I: Input, S: Step<Input = I::Item, Output = Frame>, O: Output> Pipeline<I, 
     }
 
     pub fn process_once(&mut self) -> Result<(), ProcessError> {
-        match self.input.next() {
+        match self.input.read() {
             Ok(frame) => {
                 self.step.push_input(frame);
                 while let Some(output) = self.step.pop_output() {

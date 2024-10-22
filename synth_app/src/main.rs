@@ -2,10 +2,9 @@ use async_channel::Sender;
 use iced::{widget, Element, Length, Padding};
 
 use audio::dsp::Decibels;
+use audio::stream::buffer::FrameAccumulator;
 use audio::stream::executor;
-use audio::stream::input::IteratorInput;
 use audio::stream::output::OutputDevice;
-use audio::stream::pipeline::Identity;
 use audio::stream::{ChannelCount, SampleRate};
 use audio::synth;
 
@@ -26,12 +25,8 @@ impl Default for Synthesizer {
         let (request_sender, _recv, _join) = executor::PipelineExecutor::new(
             channels,
             sample_rate,
-            IteratorInput::new(
-                synth::SinIterator::new(sample_rate, 200., 0.),
-                sample_rate,
-                OutputDevice::DEVICE_BUFFER as usize,
-            ),
-            Identity::new(),
+            synth::SinIterator::new(sample_rate, 200., 0.),
+            FrameAccumulator::new(channels, sample_rate, OutputDevice::DEVICE_BUFFER as usize),
         );
         Synthesizer {
             request_sender,

@@ -1,9 +1,11 @@
 use std::cmp;
 use std::collections::VecDeque;
 use std::iter;
+use std::mem;
 use std::slice;
 
-use super::input::{ChannelCount, Frame, Input, InputError, Instant, SampleRate};
+use super::input::{ChannelCount, Frame, Input, InputAdapter, InputError, Instant, SampleRate};
+use super::pipeline::Step;
 
 /// A set of per-channel ringbuffers. This accomplishes two things:
 /// - de-interlaces the samples we receive from the device, because ~everything
@@ -280,7 +282,7 @@ pub struct BufferedInput<T: Input<Item = Frame>> {
 impl<T: Input<Item = Frame>> BufferedInput<T> {
     /// The BufferedInput will get its sample rate and channel count from the input
     pub fn new(mut input: T, period_len: usize) -> Result<BufferedInput<T>, InputError> {
-        let frame = input.next()?;
+        let frame = input.read()?;
         let mut buffer = PeriodBuffer::new(
             SampleBuffer::new(frame.channels, frame.sample_rate, 2 * period_len),
             period_len,
@@ -293,10 +295,85 @@ impl<T: Input<Item = Frame>> BufferedInput<T> {
     pub fn next(&mut self) -> Result<Period, InputError> {
         // Read from the input until a full period is available
         while !self.buffer.has_next() {
-            let frame = self.input.next()?;
+            let frame = self.input.read()?;
             self.buffer.push(&frame);
         }
         Ok(self.buffer.next().unwrap())
+    }
+}
+
+impl<T: Input<Item = f32>> BufferedInput<InputAdapter<T, FrameAccumulator>> {
+    pub fn from_sample_input(
+        input: T,
+        channels: ChannelCount,
+        sample_rate: SampleRate,
+        period_len: usize,
+    ) -> Result<BufferedInput<InputAdapter<T, FrameAccumulator>>, InputError> {
+        BufferedInput::new(
+            InputAdapter::new(
+                input,
+                FrameAccumulator::new(channels, sample_rate, period_len),
+            ),
+            period_len,
+        )
+    }
+}
+
+/// Accumulates interlaced samples into `Frame`s.
+pub struct FrameAccumulator {
+    channels: ChannelCount,
+    sample_rate: SampleRate,
+    frame_len: usize,
+    samples: Vec<f32>,
+}
+
+impl FrameAccumulator {
+    // Smallish for tests that want to use small buffers; it probably doesn't
+    // really matter what this is set to most of the time
+    pub const DEFAULT_FRAME_LEN: usize = 16;
+
+    pub fn new(
+        channels: ChannelCount,
+        sample_rate: SampleRate,
+        frame_len: usize,
+    ) -> FrameAccumulator {
+        assert_eq!(frame_len % usize::from(channels), 0);
+        FrameAccumulator {
+            channels,
+            sample_rate,
+            frame_len,
+            samples: Vec::with_capacity(frame_len),
+        }
+    }
+
+    pub fn with_frame_len(mut self, new_len: usize) -> Self {
+        assert!(self.samples.is_empty());
+        self.frame_len = new_len;
+        self.samples.reserve_exact(new_len);
+        self
+    }
+}
+
+impl Step for FrameAccumulator {
+    type Input = f32;
+    type Output = Frame;
+
+    fn push_input(&mut self, input: f32) {
+        self.samples.push(input);
+    }
+
+    fn pop_output(&mut self) -> Option<Frame> {
+        if self.samples.len() == self.frame_len {
+            let mut res = Frame {
+                channels: self.channels,
+                sample_rate: self.sample_rate,
+                samples: Vec::with_capacity(self.frame_len),
+            };
+            mem::swap(&mut res.samples, &mut self.samples);
+            Some(res)
+        } else {
+            None
+        }
     }
 }
 
@@ -443,5 +520,24 @@ mod tests {
         } else {
             panic!("expected period");
         }
+    }
+
+    #[test]
+    fn test_frame_accumulator() {
+        let mut accum = FrameAccumulator::new(ChannelCount::new(1), SampleRate::new(44100), 4);
+        for i in 0..3 {
+            accum.push_input(i as f32);
+            assert!(accum.pop_output().is_none());
+        }
+        accum.push_input(3.);
+        let f = accum.pop_output().unwrap();
+        assert_eq!(f.samples, [0., 1., 2., 3.]);
+
+        for i in 4..8 {
+            accum.push_input(i as f32);
+        }
+        let f = accum.pop_output().unwrap();
+        assert_eq!(f.samples, [4., 5., 6., 7.]);
+        assert!(accum.pop_output().is_none());
     }
 }

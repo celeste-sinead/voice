@@ -4,6 +4,8 @@ use async_channel::{Receiver, TryRecvError, TrySendError};
 use cpal;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
+use super::pipeline::Step;
+
 // TODO: move other users to use the new location of these:
 pub use super::{ChannelCount, Frame, Instant, SampleRate};
 
@@ -15,8 +17,57 @@ pub enum InputError {
 
 pub trait Input {
     type Item;
-    fn next(&mut self) -> Result<Self::Item, InputError>;
-    fn try_next(&mut self) -> Result<Option<Self::Item>, InputError>;
+    fn read(&mut self) -> Result<Self::Item, InputError>;
+    fn try_read(&mut self) -> Result<Option<Self::Item>, InputError>;
+}
+
+impl<T, I: Iterator<Item = T>> Input for I {
+    type Item = T;
+
+    fn try_read(&mut self) -> Result<Option<T>, InputError> {
+        Ok(self.next())
+    }
+
+    fn read(&mut self) -> Result<T, InputError> {
+        self.next().ok_or(InputError::StreamEnded)
+    }
+}
+
+pub struct InputAdapter<I: Input, S: Step<Input = I::Item>> {
+    input: I,
+    step: S,
+}
+
+impl<I: Input, S: Step<Input = I::Item>> InputAdapter<I, S> {
+    pub fn new(input: I, step: S) -> InputAdapter<I, S> {
+        InputAdapter { input, step }
+    }
+}
+
+impl<I: Input, S: Step<Input = I::Item>> Input for InputAdapter<I, S> {
+    type Item = S::Output;
+
+    fn read(&mut self) -> Result<Self::Item, InputError> {
+        loop {
+            if let Some(output) = self.step.pop_output() {
+                return Ok(output);
+            }
+            self.step.push_input(self.input.read()?);
+        }
+    }
+
+    fn try_read(&mut self) -> Result<Option<Self::Item>, InputError> {
+        loop {
+            if let Some(output) = self.step.pop_output() {
+                return Ok(Some(output));
+            }
+            if let Some(input) = self.input.try_read()? {
+                self.step.push_input(input);
+            } else {
+                return Ok(None);
+            }
+        }
+    }
 }
 
 /// Opens a stream from an audio input device, receives sample data callbacks
@@ -99,92 +150,18 @@ impl InputDevice {
 impl Input for InputDevice {
     type Item = Frame;
 
-    fn next(&mut self) -> Result<Frame, InputError> {
+    fn read(&mut self) -> Result<Frame, InputError> {
         match self.frames.recv_blocking() {
             Ok(f) => Ok(f),
             Err(_) => Err(InputError::DeviceClosed),
         }
     }
 
-    fn try_next(&mut self) -> Result<Option<Frame>, InputError> {
+    fn try_read(&mut self) -> Result<Option<Frame>, InputError> {
         match self.frames.try_recv() {
             Ok(f) => Ok(Some(f)),
             Err(TryRecvError::Empty) => Ok(None),
             Err(TryRecvError::Closed) => Err(InputError::DeviceClosed),
         }
-    }
-}
-
-/// Implements Input for an iterator that returns samples for a single channel
-/// (i.e. accumulates those results into `Frame`s).
-/// Assumes that once the iterator is exhausted, it will never return more
-/// results.
-pub struct IteratorInput<I: Iterator<Item = f32>> {
-    iter: I,
-    sample_rate: SampleRate,
-    frame_len: usize,
-}
-
-impl<I: Iterator<Item = f32>> IteratorInput<I> {
-    // Smallish for tests that want to use small buffers; it probably doesn't
-    // really matter what this is set to most of the time
-    pub const DEFAULT_FRAME_LEN: usize = 16;
-
-    pub fn new(iter: I, sample_rate: SampleRate, frame_len: usize) -> IteratorInput<I> {
-        IteratorInput {
-            iter,
-            sample_rate,
-            frame_len,
-        }
-    }
-
-    pub fn with_frame_len(mut self, new_len: usize) -> Self {
-        self.frame_len = new_len;
-        self
-    }
-}
-
-impl<I: Iterator<Item = f32>> Input for IteratorInput<I> {
-    type Item = Frame;
-
-    fn try_next(&mut self) -> Result<Option<Frame>, InputError> {
-        let mut res = Frame {
-            channels: ChannelCount::new(1),
-            sample_rate: self.sample_rate,
-            samples: Vec::new(),
-        };
-        for _ in 0..self.frame_len {
-            match self.iter.next() {
-                Some(s) => res.samples.push(s),
-                None => return Ok(None),
-            }
-        }
-        Ok(Some(res))
-    }
-    fn next(&mut self) -> Result<Frame, InputError> {
-        match self.try_next() {
-            Ok(Some(f)) => Ok(f),
-            Ok(None) => Err(InputError::StreamEnded),
-            Err(e) => Err(e),
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_iter_input() {
-        let mut input = IteratorInput::new(
-            Box::new((0..8).map(|i| i as f32)),
-            SampleRate::new(44100),
-            4,
-        );
-        let f = input.next().unwrap();
-        assert_eq!(f.samples, [0., 1., 2., 3.]);
-        let f = input.next().unwrap();
-        assert_eq!(f.samples, [4., 5., 6., 7.]);
-        assert!(input.next().is_err());
     }
 }

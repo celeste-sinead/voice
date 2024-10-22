@@ -234,18 +234,22 @@ mod tests {
 
     use crate::stream::buffer::BufferedInput;
     use crate::stream::input::SampleRate;
+    use crate::stream::ChannelCount;
     use crate::synth;
 
     #[test]
     fn test_rms() {
         assert_relative_eq!(
-            rms(
-                &BufferedInput::new(synth::sin(SampleRate::new(100), 1., 0.), 100)
-                    .unwrap()
-                    .next()
-                    .unwrap()
-                    .get_channel(0)
-            ),
+            rms(&BufferedInput::from_sample_input(
+                synth::SinIterator::new(SampleRate::new(100), 1., 0.),
+                ChannelCount::new(1),
+                SampleRate::new(100),
+                100
+            )
+            .unwrap()
+            .next()
+            .unwrap()
+            .get_channel(0)),
             1.0 / 2f32.sqrt()
         )
     }
