@@ -55,6 +55,14 @@ impl<I: Input, S: Step<Input = I::Item, Output = Frame>, O: Output> Pipeline<I, 
             Err(e) => Err(ProcessError::InputError(e)),
         }
     }
+
+    pub fn input_mut(&mut self) -> &mut I {
+        &mut self.input
+    }
+
+    pub fn step_mut(&mut self) -> &mut S {
+        &mut self.step
+    }
 }
 
 /// A `Step` that outputs its input.
@@ -89,6 +97,24 @@ impl<T> Step for Identity<T> {
 pub struct Chain<First: Step, Second: Step<Input = First::Output>> {
     first: First,
     second: Second,
+}
+
+impl<First, Second> Chain<First, Second>
+where
+    First: Step,
+    Second: Step<Input = First::Output>,
+{
+    pub fn new(first: First, second: Second) -> Chain<First, Second> {
+        Chain { first, second }
+    }
+
+    pub fn first_mut(&mut self) -> &mut First {
+        &mut self.first
+    }
+
+    pub fn second_mut(&mut self) -> &mut Second {
+        &mut self.second
+    }
 }
 
 impl<First: Step, Second: Step<Input = First::Output>> Step for Chain<First, Second> {

@@ -1,6 +1,8 @@
 use std::f32::consts::PI;
 
+use crate::dsp::Decibels;
 use crate::stream::input::SampleRate;
+use crate::stream::pipeline::Step;
 
 /// An iterator that returns and infinite sequence of sample times (seconds)
 /// for a given sample rate (which is a useful base for synthesizing signals)
@@ -44,6 +46,10 @@ impl SinIterator {
             clock: SampleClock::new(sample_rate),
         }
     }
+
+    pub fn set_frequency(&mut self, frequency: f32) {
+        self.frequency = frequency
+    }
 }
 
 impl Iterator for SinIterator {
@@ -54,6 +60,45 @@ impl Iterator for SinIterator {
             Some(t) => Some((2. * PI * self.frequency * t + self.phase).sin()),
             None => panic!("impossible, clock is infinite"),
         }
+    }
+}
+
+pub struct Gain {
+    gain: f32,
+    next: Option<f32>,
+}
+
+impl Gain {
+    pub fn new(gain: Decibels) -> Gain {
+        Gain {
+            // sqrt converts from power ratio to amplitude ratio
+            gain: gain.into_full_scale().sqrt(),
+            next: None,
+        }
+    }
+
+    pub fn set_gain(&mut self, gain: Decibels) {
+        self.gain = gain.into_full_scale().sqrt();
+    }
+}
+
+impl Default for Gain {
+    fn default() -> Gain {
+        Gain::new(Decibels::new(0.))
+    }
+}
+
+impl Step for Gain {
+    type Input = f32;
+    type Output = f32;
+
+    fn push_input(&mut self, v: f32) {
+        assert!(self.next.is_none());
+        self.next = Some(v * self.gain);
+    }
+
+    fn pop_output(&mut self) -> Option<f32> {
+        self.next.take()
     }
 }
 

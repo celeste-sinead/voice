@@ -24,8 +24,13 @@ impl Decibels {
     pub fn new(db: f32) -> Decibels {
         Decibels(db)
     }
+
     pub fn from_full_scale(fs: f32) -> Decibels {
         Decibels(10. * fs.log10())
+    }
+
+    pub fn into_full_scale(self) -> f32 {
+        10f32.powf(self.0 / 10.)
     }
 }
 
@@ -257,6 +262,11 @@ mod tests {
     #[test]
     fn db_from_full_scale() {
         assert_eq!(Decibels::from_full_scale(0.1), Decibels(-10.))
+    }
+
+    #[test]
+    fn full_scale_from_db() {
+        assert_eq!(Decibels::new(-10.).into_full_scale(), 0.1);
     }
 
     #[test]

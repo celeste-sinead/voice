@@ -1,4 +1,5 @@
 use std::thread;
+// use std::marker::Send;
 
 use async_channel::{Receiver, Sender, TryRecvError};
 
@@ -9,7 +10,6 @@ use super::pipeline::{Pipeline, Step};
 use super::transform::FFT;
 use super::wav::WavWriter;
 use super::{ChannelCount, Frame, SampleRate};
-use crate::dsp::Decibels;
 use crate::{dsp, Message, RMSLevels};
 
 // The maximum length of channels passing audio data amongst threads
@@ -97,29 +97,34 @@ impl Executor {
     }
 }
 
-#[derive(Debug)]
-pub enum Request {
-    SetGain(Decibels),
-}
-
-#[derive(Debug)]
-pub struct Response();
-
 /// TODO: this should be merged with Executor
-pub struct PipelineExecutor<I: Input, S: Step<Input = I::Item, Output = Frame>> {
+pub struct PipelineExecutor<I, S, Cmd>
+where
+    I: Input,
+    S: Step<Input = I::Item, Output = Frame>,
+    Cmd: Send + 'static,
+{
     pipeline: Pipeline<I, S, OutputDevice>,
-    receiver: Receiver<Request>,
+    receiver: Receiver<Cmd>,
+    update: Box<dyn Fn(&mut Pipeline<I, S, OutputDevice>, Cmd) -> ()>,
 }
 
-impl<I: Input + Send + 'static, S: Step<Input = I::Item, Output = Frame> + Send + 'static>
-    PipelineExecutor<I, S>
+impl<I, S, Cmd> PipelineExecutor<I, S, Cmd>
+where
+    I: Input + Send + 'static,
+    S: Step<Input = I::Item, Output = Frame> + Send + 'static,
+    Cmd: Send + 'static,
 {
-    pub fn new(
+    pub fn new<UpdateFn>(
         channels: ChannelCount,
         sample_rate: SampleRate,
         input: I,
         step: S,
-    ) -> (Sender<Request>, Receiver<Response>, thread::JoinHandle<()>) {
+        update: Box<UpdateFn>,
+    ) -> (Sender<Cmd>, Receiver<()>, thread::JoinHandle<()>)
+    where
+        UpdateFn: Fn(&mut Pipeline<I, S, OutputDevice>, Cmd) -> () + Send + 'static,
+    {
         let (req_send, req_recv) = async_channel::bounded(CHANNEL_MAX);
         let (_msg_send, msg_recv) = async_channel::bounded(CHANNEL_MAX);
         (
@@ -133,6 +138,7 @@ impl<I: Input + Send + 'static, S: Step<Input = I::Item, Output = Frame> + Send 
                         OutputDevice::new(channels, sample_rate).unwrap(),
                     ),
                     receiver: req_recv,
+                    update,
                 };
                 executor.run();
             }),
@@ -142,7 +148,7 @@ impl<I: Input + Send + 'static, S: Step<Input = I::Item, Output = Frame> + Send 
     fn run(&mut self) {
         loop {
             match self.receiver.try_recv() {
-                Ok(req) => println!("Got Request: {:?}", req),
+                Ok(cmd) => (self.update)(&mut self.pipeline, cmd),
                 Err(TryRecvError::Empty) => (),
                 Err(_) => {
                     println!("Executor: UI exited");
