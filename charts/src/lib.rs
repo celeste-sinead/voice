@@ -1,10 +1,10 @@
-use audio::dsp;
+use audio::dsp::fft::FoldedFFT;
 use plotters::prelude::*;
 use std::f32::consts::PI;
 
 pub fn build_fft_chart<DB: DrawingBackend>(
     mut builder: ChartBuilder<DB>,
-    fft: &dsp::FoldedFFT,
+    fft: &FoldedFFT,
 ) -> Result<(), DrawingAreaErrorKind<DB::ErrorType>> {
     let mut chart = builder
         .margin(20)

@@ -1,4 +1,4 @@
-use crate::dsp::{FFTSequence, FoldedFFT};
+use crate::dsp::fft::{FFTSequence, FoldedFFT};
 use crate::stream::buffer::Period;
 use crate::stream::SampleRate;
 use crate::Instant;

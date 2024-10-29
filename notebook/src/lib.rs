@@ -9,9 +9,9 @@
 pub use std::f32::consts::PI;
 
 pub use audio;
+pub use audio::dsp::fft::FoldedFFT;
 pub use audio::stream::buffer::{BufferedInput, Period};
 pub use audio::stream::input::SampleRate;
-pub use audio::{dsp, synth};
 pub use charts;
 pub use num_complex::Complex;
 pub use plotters;
@@ -44,7 +44,7 @@ pub fn plot_period(period: &Period) -> SVGWrapper {
     })
 }
 
-pub fn plot_fft(fft: &dsp::FoldedFFT) -> SVGWrapper {
+pub fn plot_fft(fft: &FoldedFFT) -> SVGWrapper {
     evcxr_figure((640, 480), |root| {
         root.fill(&WHITE)?;
         charts::build_fft_chart(ChartBuilder::on(&root), fft)?;
