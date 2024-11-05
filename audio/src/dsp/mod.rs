@@ -4,6 +4,7 @@ use std::fmt::{Display, Formatter};
 use crate::stream::buffer::ChannelPeriod;
 
 pub mod fft;
+pub mod filter;
 
 pub fn rms(period: &ChannelPeriod) -> f32 {
     let sum_sq = period.iter().fold(0.0, |acc, x| acc + x * x);
