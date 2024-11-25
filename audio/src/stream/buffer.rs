@@ -1,6 +1,7 @@
 use std::cmp;
 use std::collections::VecDeque;
 use std::iter;
+use std::marker::PhantomData;
 use std::mem;
 use std::slice;
 
@@ -274,41 +275,53 @@ impl PeriodBuffer {
     }
 }
 
-pub struct BufferedInput<T: Input<Item = Frame>> {
+pub struct BufferedInput<'a, T: Input<'a, Item = Frame>> {
     input: T,
     buffer: PeriodBuffer,
+    _phantom: PhantomData<&'a ()>,
 }
 
-impl<T: Input<Item = Frame>> BufferedInput<T> {
+impl<'a, T> BufferedInput<'a, T>
+where
+    T: Input<'a, Item = Frame> + 'a,
+{
     /// The BufferedInput will get its sample rate and channel count from the input
-    pub fn new(mut input: T, period_len: usize) -> Result<BufferedInput<T>, InputError> {
-        let frame = input.read()?;
-        let mut buffer = PeriodBuffer::new(
-            SampleBuffer::new(frame.channels, frame.sample_rate, 2 * period_len),
+    pub fn new(input: T, period_len: usize) -> Result<BufferedInput<'a, T>, InputError> {
+        // let frame = input.read()?;
+        let buffer = PeriodBuffer::new(
+            SampleBuffer::new(ChannelCount::new(1), SampleRate::new(1), 2 * period_len),
             period_len,
             period_len,
         );
-        buffer.push(&frame);
-        Ok(BufferedInput { input, buffer })
+        // buffer.push(&frame);
+        Ok(BufferedInput {
+            input,
+            buffer,
+            _phantom: PhantomData,
+        })
     }
 
     pub fn next(&mut self) -> Result<Period, InputError> {
         // Read from the input until a full period is available
-        while !self.buffer.has_next() {
-            let frame = self.input.read()?;
-            self.buffer.push(&frame);
-        }
-        Ok(self.buffer.next().unwrap())
+        todo!()
+        // while !self.buffer.has_next() {
+        //     let frame = self.input.read()?;
+        //     self.buffer.push(&frame);
+        // }
+        // Ok(self.buffer.next().unwrap())
     }
 }
 
-impl<T: Input<Item = f32>> BufferedInput<InputAdapter<T, FrameAccumulator>> {
+impl<'a, T> BufferedInput<'a, InputAdapter<'a, T, FrameAccumulator>>
+where
+    T: Input<'a, Item = f32> + 'a,
+{
     pub fn from_sample_input(
         input: T,
         channels: ChannelCount,
         sample_rate: SampleRate,
         period_len: usize,
-    ) -> Result<BufferedInput<InputAdapter<T, FrameAccumulator>>, InputError> {
+    ) -> Result<BufferedInput<'a, InputAdapter<'a, T, FrameAccumulator>>, InputError> {
         BufferedInput::new(
             InputAdapter::new(
                 input,
@@ -354,15 +367,13 @@ impl FrameAccumulator {
     }
 }
 
-impl Step for FrameAccumulator {
+impl Step<'_> for FrameAccumulator {
     type Input = f32;
     type Output = Frame;
+    type Result = Option<Frame>;
 
-    fn push_input(&mut self, input: f32) {
+    fn process(&mut self, input: f32) -> Option<Frame> {
         self.samples.push(input);
-    }
-
-    fn pop_output(&mut self) -> Option<Frame> {
         if self.samples.len() == self.frame_len {
             let mut res = Frame {
                 channels: self.channels,
@@ -526,18 +537,15 @@ mod tests {
     fn test_frame_accumulator() {
         let mut accum = FrameAccumulator::new(ChannelCount::new(1), SampleRate::new(44100), 4);
         for i in 0..3 {
-            accum.push_input(i as f32);
-            assert!(accum.pop_output().is_none());
+            assert!(accum.process(i as f32).is_none());
         }
-        accum.push_input(3.);
-        let f = accum.pop_output().unwrap();
+        let f = accum.process(3.).unwrap();
         assert_eq!(f.samples, [0., 1., 2., 3.]);
 
-        for i in 4..8 {
-            accum.push_input(i as f32);
+        for i in 4..7 {
+            assert!(accum.process(i as f32).is_none());
         }
-        let f = accum.pop_output().unwrap();
+        let f = accum.process(7.).unwrap();
         assert_eq!(f.samples, [4., 5., 6., 7.]);
-        assert!(accum.pop_output().is_none());
     }
 }

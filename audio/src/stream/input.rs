@@ -3,6 +3,7 @@ use async_channel;
 use async_channel::{Receiver, TryRecvError, TrySendError};
 use cpal;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use std::marker::PhantomData;
 
 use super::pipeline::Step;
 
@@ -15,13 +16,13 @@ pub enum InputError {
     StreamEnded,
 }
 
-pub trait Input {
+pub trait Input<'a> {
     type Item;
-    fn read(&mut self) -> Result<Self::Item, InputError>;
-    fn try_read(&mut self) -> Result<Option<Self::Item>, InputError>;
+    fn read(&'a mut self) -> Result<Self::Item, InputError>;
+    fn try_read(&'a mut self) -> Result<Option<Self::Item>, InputError>;
 }
 
-impl<T, I: Iterator<Item = T>> Input for I {
+impl<'a, T, I: Iterator<Item = T>> Input<'a> for I {
     type Item = T;
 
     fn try_read(&mut self) -> Result<Option<T>, InputError> {
@@ -33,40 +34,95 @@ impl<T, I: Iterator<Item = T>> Input for I {
     }
 }
 
-pub struct InputAdapter<I: Input, S: Step<Input = I::Item>> {
+pub struct InputAdapter<'a, I: Input<'a>, S: Step<'a, Input = I::Item>> {
     input: I,
     step: S,
+    next_outputs: Option<<<S as Step<'a>>::Result as IntoIterator>::IntoIter>,
+    _phantom: PhantomData<&'a ()>,
 }
 
-impl<I: Input, S: Step<Input = I::Item>> InputAdapter<I, S> {
-    pub fn new(input: I, step: S) -> InputAdapter<I, S> {
-        InputAdapter { input, step }
+impl<'a, I, S> InputAdapter<'a, I, S>
+where
+    I: Input<'a>,
+    S: Step<'a, Input = I::Item>,
+{
+    pub fn new(input: I, step: S) -> InputAdapter<'a, I, S> {
+        InputAdapter {
+            input,
+            step,
+            next_outputs: None,
+            _phantom: PhantomData,
+        }
+    }
+
+    fn maybe_read_once(&'a mut self) -> Option<Result<S::Output, InputError>> {
+        if let Some(output) = self.next_outputs.as_mut() {
+            if let Some(output) = output.next() {
+                return Some(Ok(output));
+            }
+        }
+        let next_input = match self.input.read() {
+            Ok(input) => input,
+            Err(e) => return Some(Err(e)),
+        };
+        self.next_outputs = Some(self.step.process(next_input).into_iter());
+        None
     }
 }
 
-impl<I: Input, S: Step<Input = I::Item>> Input for InputAdapter<I, S> {
+impl<'a, I, S> Input<'a> for InputAdapter<'a, I, S>
+where
+    I: Input<'a>,
+    S: Step<'a, Input = I::Item>,
+{
     type Item = S::Output;
 
-    fn read(&mut self) -> Result<Self::Item, InputError> {
-        loop {
-            if let Some(output) = self.step.pop_output() {
+    fn read(&'a mut self) -> Result<Self::Item, InputError> {
+        // First, check if we already have the next output ready
+        if let Some(output) = self.next_outputs.as_mut() {
+            if let Some(output) = output.next() {
                 return Ok(output);
             }
-            self.step.push_input(self.input.read()?);
         }
+
+        // Read inputs and process them with the adapter step until an output
+        // item is produced.
+        todo!()
+        // let input = &mut self.input;
+        // let step = &mut self.step;
+        // loop {
+        // self.input.read();
+        // let next_input = input.read()?;
+        // let mut results = step.process(next_input).into_iter();
+        // if let Some(result) = results.next() {
+        //     self.next_outputs = Some(results);
+        //     return Ok(result);
+        // }
+        // }
     }
 
     fn try_read(&mut self) -> Result<Option<Self::Item>, InputError> {
-        loop {
-            if let Some(output) = self.step.pop_output() {
-                return Ok(Some(output));
-            }
-            if let Some(input) = self.input.try_read()? {
-                self.step.push_input(input);
-            } else {
-                return Ok(None);
-            }
-        }
+        todo!()
+        // // First, check if we already have the next output ready
+        // if let Some(outputs) = self.next_outputs {
+        //     if let Some(output) = outputs.next() {
+        //         return Ok(Some(output));
+        //     }
+        // }
+
+        // // Read inputs and process them with the adapter step until either an
+        // // output item is produced, or no input is currently available.
+        // loop {
+        //     if let Some(next_input) = self.input.try_read()? {
+        //         let results = self.step.process(next_input).into_iter();
+        //         if let Some(result) = results.next() {
+        //             self.next_outputs = Some(results);
+        //             return Ok(Some(result));
+        //         }
+        //     } else {
+        //         return Ok(None);
+        //     }
+        // }
     }
 }
 
@@ -147,7 +203,7 @@ impl InputDevice {
     }
 }
 
-impl Input for InputDevice {
+impl Input<'_> for InputDevice {
     type Item = Frame;
 
     fn read(&mut self) -> Result<Frame, InputError> {

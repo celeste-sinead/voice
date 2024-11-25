@@ -40,18 +40,16 @@ impl LTI {
     }
 }
 
-impl Step for LTI {
+impl Step<'_> for LTI {
     type Input = f32;
     type Output = f32;
+    type Result = Option<f32>;
 
-    fn push_input(&mut self, next_in: f32) {
-        // Make sure we have room to push another output
-        assert!(self.next + 1 < self.outputs.len() as isize);
-
+    fn process(&mut self, input: f32) -> Option<f32> {
         // Add the new input to the input ringbuffer and multiply inputs with
         // feedforward coefficients
         self.inputs.pop_back();
-        self.inputs.push_front(next_in);
+        self.inputs.push_front(input);
         let mut next_out = 0f32;
         for i in 0..self.feedforward.len() {
             next_out += self.feedforward[i] * self.inputs[i];
@@ -69,16 +67,7 @@ impl Step for LTI {
         }
 
         self.outputs[0] = next_out;
-    }
-
-    fn pop_output(&mut self) -> Option<f32> {
-        if self.next >= 0 {
-            let res = Some(self.outputs[self.next as usize]);
-            self.next -= 1;
-            res
-        } else {
-            None
-        }
+        Some(next_out)
     }
 }
 
@@ -90,8 +79,7 @@ mod tests {
         assert_eq!(input.len(), expect_output.len());
         let mut output = Vec::new();
         for i in 0..input.len() {
-            lti.push_input(input[i]);
-            output.push(lti.pop_output().unwrap());
+            output.push(lti.process(input[i]).unwrap());
         }
         assert_eq!(expect_output, &output);
     }
@@ -99,7 +87,6 @@ mod tests {
     #[test]
     fn test_feedforward() {
         let mut lti = LTI::new(vec![1.], vec![0.5, 0.0, 0.3]);
-        assert!(lti.pop_output().is_none());
         assert_response(&mut lti, &[1., 0., 0.], &[0.5, 0.0, 0.3]);
         assert_response(&mut lti, &[1., 0., 1.], &[0.5, 0.0, 0.8]);
     }

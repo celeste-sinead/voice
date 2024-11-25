@@ -65,7 +65,6 @@ impl Iterator for SinIterator {
 
 pub struct Gain {
     gain: f32,
-    next: Option<f32>,
 }
 
 impl Gain {
@@ -73,7 +72,6 @@ impl Gain {
         Gain {
             // sqrt converts from power ratio to amplitude ratio
             gain: gain.into_full_scale().sqrt(),
-            next: None,
         }
     }
 
@@ -88,17 +86,13 @@ impl Default for Gain {
     }
 }
 
-impl Step for Gain {
+impl<'a> Step<'a> for Gain {
     type Input = f32;
     type Output = f32;
+    type Result = Option<f32>;
 
-    fn push_input(&mut self, v: f32) {
-        assert!(self.next.is_none());
-        self.next = Some(v * self.gain);
-    }
-
-    fn pop_output(&mut self) -> Option<f32> {
-        self.next.take()
+    fn process(&mut self, v: f32) -> Option<f32> {
+        Some(v * self.gain)
     }
 }
 

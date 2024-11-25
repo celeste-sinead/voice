@@ -66,24 +66,28 @@ impl Executor {
     }
 
     /// The main loop of the audio processing thread
-    fn run<T: Input<Item = Frame>>(mut self, mut input: T) {
-        loop {
-            match input.read() {
-                Ok(f) => {
-                    for m in self.process(&f) {
-                        if let Err(_) = self.sender.send_blocking(m) {
-                            println!("Executor exit: UI closed.");
-                            return;
-                        }
-                    }
-                }
-                Err(_) => {
-                    println!("Executor exit: audio input closed.");
-                    let _e = self.sender.send_blocking(Message::AudioStreamClosed);
-                    return;
-                }
-            }
-        }
+    fn run<'a, T>(self, _input: T)
+    where
+        T: Input<'a, Item = Frame> + 'a,
+    {
+        todo!()
+        // loop {
+        //     match input.read() {
+        //         Ok(f) => {
+        //             for m in self.process(&f) {
+        //                 if let Err(_) = self.sender.send_blocking(m) {
+        //                     println!("Executor exit: UI closed.");
+        //                     return;
+        //                 }
+        //             }
+        //         }
+        //         Err(_) => {
+        //             println!("Executor exit: audio input closed.");
+        //             let _e = self.sender.send_blocking(Message::AudioStreamClosed);
+        //             return;
+        //         }
+        //     }
+        // }
     }
 
     /// Spawn a new thread to run this executor
@@ -101,7 +105,7 @@ impl Executor {
 pub struct PipelineExecutor<I, S, Cmd>
 where
     I: Input,
-    S: Step<Input = I::Item, Output = Frame>,
+    S: for<'a> Step<'a, Input = I::Item, Output = Frame>,
     Cmd: Send + 'static,
 {
     pipeline: Pipeline<I, S, OutputDevice>,
@@ -112,7 +116,7 @@ where
 impl<I, S, Cmd> PipelineExecutor<I, S, Cmd>
 where
     I: Input + Send + 'static,
-    S: Step<Input = I::Item, Output = Frame> + Send + 'static,
+    S: for<'a> Step<'a, Input = I::Item, Output = Frame> + Send + 'static,
     Cmd: Send + 'static,
 {
     pub fn new<UpdateFn>(
